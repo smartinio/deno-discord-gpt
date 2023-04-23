@@ -1,40 +1,24 @@
 import { json, serve } from "https://deno.land/x/sift@0.6.0/mod.ts";
-import { OpenAI } from "https://deno.land/x/openai@1.3.1/mod.ts";
 import {
   createBot,
   Intents,
   startBot,
 } from "https://deno.land/x/discordeno@13.0.0/mod.ts";
 
-const BOT_ROLE_ID = 634461594155483138n;
-const AI_CURIOUS_ROLE_ID = 1098370802526724206n;
+import { ask } from "./openai.ts";
+import { redis } from "./redis.ts";
 
+const AI_CURIOUS_ROLE_ID = 1098370802526724206n;
 const DISCORD_CLIENT_ID = BigInt(Deno.env.get("DISCORD_CLIENT_ID") as string);
 const DISCORD_TOKEN = Deno.env.get("DISCORD_TOKEN") as string;
-const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") as string;
+const INITIAL_MENTION = new RegExp(`^<@${DISCORD_CLIENT_ID}>[^A-Za-z0-9]*`);
+const MIDWAY_MENTION = new RegExp(`<@${DISCORD_CLIENT_ID}>`);
 
-const BOT_MENTION = `(${DISCORD_CLIENT_ID}|\&${BOT_ROLE_ID})`;
-const initialMention = new RegExp(`^<@${BOT_MENTION}>[^A-Za-z0-9]*`);
-const midwayMention = new RegExp(`<@${BOT_MENTION}>`);
-
-const openAI = new OpenAI(OPENAI_API_KEY);
-
-const ask = (question: string) => {
-  return openAI.createChatCompletion({
-    model: "gpt-3.5-turbo",
-    messages: [
-      {
-        "role": "system",
-        "content":
-          "You are a helpful assistant. Answer as concisely as possible.",
-      },
-      { "role": "user", "content": question },
-    ],
-  });
+const acquireTask = async (taskId: string) => {
+  return await redis.set(taskId, 1, { nx: true, ex: 30 });
 };
 
 const bot = createBot({
-  botId: DISCORD_CLIENT_ID,
   token: DISCORD_TOKEN,
   intents: Intents.GuildMessages | Intents.MessageContent,
   events: {
@@ -43,10 +27,15 @@ const bot = createBot({
         return;
       }
 
-      if (
-        !message.mentionedRoleIds.includes(BOT_ROLE_ID) &&
-        !message.mentionedUserIds.includes(DISCORD_CLIENT_ID)
-      ) {
+      if (!message.mentionedUserIds.includes(DISCORD_CLIENT_ID)) {
+        return;
+      }
+
+      const taskId = `task:${message.id}`;
+
+      const taskStatus = await acquireTask(taskId);
+
+      if (taskStatus !== "OK") {
         return;
       }
 
@@ -55,24 +44,18 @@ const bot = createBot({
       const response = (content: string) => {
         return bot.helpers.sendMessage(message.channelId, {
           content: `<@${message.authorId}> ${content}`,
-          messageReference: {
-            ...message.messageReference,
-            failIfNotExists: false,
-          },
         });
       };
 
-      if (!initialMention.test(message.content)) {
+      if (!INITIAL_MENTION.test(message.content)) {
         return response(
-          `Please @ me like this when asking a question: \`<@${bot.applicationId}> what is the meaning of life?\``,
+          `Please @ me before your question like this: <@${bot.applicationId}> what is the meaning of life?`,
         );
       }
 
-      const nonBotMentions = message.mentionedUserIds.filter((id) => {
-        return id !== DISCORD_CLIENT_ID;
-      }).concat(message.mentionedRoleIds.filter((id) => {
-        return id !== BOT_ROLE_ID;
-      }));
+      const nonBotMentions = message.mentionedUserIds.filter((id) =>
+        id !== DISCORD_CLIENT_ID
+      );
 
       if (nonBotMentions.length > 0) {
         return response(
@@ -80,23 +63,25 @@ const bot = createBot({
         );
       }
 
-      const question = message.content.replace(initialMention, "").trim();
+      const question = message.content.replace(INITIAL_MENTION, "").trim();
 
       if (!question) {
         return response("Don't @ me unless you have a question.");
       }
 
-      if (midwayMention.test(question)) {
+      if (MIDWAY_MENTION.test(question)) {
         return response(
           "Don't @ me multiple times, please.",
         );
       }
 
-      const answer = await ask(question);
+      const answer = await ask(
+        question,
+        message.channelId,
+        message.member?.nick,
+      );
 
-      const [reply] = answer.choices;
-
-      return response(reply.message.content);
+      return response(answer);
     },
     ready() {
       console.log("Successfully connected to gateway");
@@ -107,5 +92,6 @@ const bot = createBot({
 await startBot(bot);
 
 serve({
-  "/ping": () => json({ message: "pong" }),
+  "/": () => json({ ping: "pong" }),
+  404: () => json({ message: "Not Found" }),
 });

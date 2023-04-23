@@ -1,0 +1,70 @@
+import {
+  ChatCompletionOptions,
+  OpenAI,
+} from "https://deno.land/x/openai@1.3.1/mod.ts";
+
+import { lock, redis } from "./redis.ts";
+
+type Message = ChatCompletionOptions["messages"][number];
+
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") as string;
+
+const openAI = new OpenAI(OPENAI_API_KEY);
+
+const initialMessage: Message = {
+  name: "system",
+  role: "system",
+  content: "You are a helpful assistant. Answer as concisely as possible.",
+};
+
+const key = (channelId: bigint) => `history:${channelId}`;
+
+const getHistory = async (channelId: bigint) => {
+  return await redis.lrange(key(channelId), 0, -1) as Message[];
+};
+
+const remember = async (channelId: bigint, ...messages: Message[]) => {
+  await redis.rpush(key(channelId), ...messages);
+};
+
+const reset = async (channelId: bigint) => {
+  await redis.del(key(channelId));
+};
+
+export const ask = async (
+  question: string,
+  channelId: bigint,
+  rawName?: string,
+): Promise<string> => {
+  return await lock(channelId, async () => {
+    if (question.toLowerCase() === "reset") {
+      await reset(channelId);
+      return "History reset. I no longer remember what we've said in this channel.";
+    }
+
+    const newMessages = [] as Message[];
+    const name = rawName ? rawName.replace(/[^a-zA-Z0-9]+/g, "_") : undefined;
+    const history = await getHistory(channelId);
+
+    if (history.length === 0) {
+      newMessages.push(initialMessage);
+    }
+
+    newMessages.push({ role: "user", name, content: question });
+
+    const answer = await openAI.createChatCompletion({
+      model: "gpt-3.5-turbo",
+      messages: history.concat(newMessages),
+    });
+
+    const [reply] = answer.choices;
+
+    if (answer.usage.total_tokens > 3500) {
+      await reset(channelId);
+    } else {
+      await remember(channelId, ...newMessages, reply.message);
+    }
+
+    return reply.message.content;
+  });
+};
