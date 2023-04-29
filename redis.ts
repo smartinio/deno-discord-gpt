@@ -1,4 +1,5 @@
 import { Redis } from "https://deno.land/x/upstash_redis@v1.14.0/mod.ts";
+import { Log } from "./logger.ts";
 
 export const redis = Redis.fromEnv({ automaticDeserialization: true });
 
@@ -26,13 +27,22 @@ const acquireLock = async (resource: bigint) => {
 
 export const lock = async <T>(
   resource: bigint,
+  log: Log,
   callback: () => Promise<T>,
 ): Promise<T> => {
+  const meta = { resource: String(resource) };
+
+  log.info("Acquiring redis lock...", meta);
+
   const releaseLock = await acquireLock(resource);
+
+  log.info("Acquired redis lock", meta);
 
   const result = await callback();
 
   await releaseLock();
+
+  log.info("Released redis lock", meta);
 
   return result;
 };

@@ -4,6 +4,7 @@ import {
 } from "https://deno.land/x/openai@1.3.1/mod.ts";
 
 import { lock, redis } from "./redis.ts";
+import { list, Log } from "./logger.ts";
 
 type Message = ChatCompletionOptions["messages"][number];
 
@@ -34,9 +35,10 @@ const reset = async (channelId: bigint) => {
 export const ask = async (
   question: string,
   channelId: bigint,
+  log: Log,
   rawName?: string,
 ): Promise<string> => {
-  return await lock(channelId, async () => {
+  return await lock(channelId, log, async () => {
     if (question.toLowerCase() === "reset") {
       await reset(channelId);
       return "History reset. I no longer remember what we've said in this channel.";
@@ -52,9 +54,16 @@ export const ask = async (
 
     newMessages.push({ role: "user", name, content: question });
 
+    const messages = history.concat(newMessages);
+
+    log.info("Querying OpenAI", {
+      channelId: String(channelId),
+      messages: list(messages),
+    });
+
     const answer = await openAI.createChatCompletion({
       model: "gpt-3.5-turbo",
-      messages: history.concat(newMessages),
+      messages,
     });
 
     const [reply] = answer.choices;

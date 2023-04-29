@@ -7,6 +7,7 @@ import {
 
 import { ask } from "./openai.ts";
 import { redis } from "./redis.ts";
+import { createLog } from "./logger.ts";
 
 const AI_CURIOUS_ROLE_ID = 1098370802526724206n;
 const DISCORD_CLIENT_ID = BigInt(Deno.env.get("DISCORD_CLIENT_ID") as string);
@@ -14,46 +15,63 @@ const DISCORD_TOKEN = Deno.env.get("DISCORD_TOKEN") as string;
 const INITIAL_MENTION = new RegExp(`^<@${DISCORD_CLIENT_ID}>[^A-Za-z0-9]*`);
 const MIDWAY_MENTION = new RegExp(`<@${DISCORD_CLIENT_ID}>`);
 
-const acquireTask = async (taskId: string) => {
-  return await redis.set(taskId, 1, { nx: true, ex: 30 });
+const instanceLog = createLog();
+
+const acquireTask = async (id: string) => {
+  return await redis.set("task:" + id, 1, { nx: true, ex: 30 });
+};
+
+const continueTyping = (channelId: bigint) => {
+  const interval = setInterval(() => bot.helpers.startTyping(channelId), 5000);
+  return () => clearInterval(interval);
 };
 
 const bot = createBot({
   token: DISCORD_TOKEN,
   intents: Intents.GuildMessages | Intents.MessageContent,
   events: {
-    async messageCreate(bot, message) {
-      if (!message.member?.roles?.includes(AI_CURIOUS_ROLE_ID)) {
+    async messageCreate(bot, msg) {
+      const { id, authorId, channelId, content, member, mentionedUserIds } =
+        msg;
+
+      if (!member?.roles?.includes(AI_CURIOUS_ROLE_ID)) {
         return;
       }
 
-      if (!message.mentionedUserIds.includes(DISCORD_CLIENT_ID)) {
+      if (!mentionedUserIds.includes(DISCORD_CLIENT_ID)) {
         return;
       }
 
-      const taskId = `task:${message.id}`;
+      const messageId = String(id);
 
-      const taskStatus = await acquireTask(taskId);
+      const taskStatus = await acquireTask(messageId);
+
+      const log = createLog({ messageId });
 
       if (taskStatus !== "OK") {
+        log.info("Message already being processed");
         return;
       }
 
-      bot.helpers.startTyping(message.channelId);
+      log.info("Processing message", { content });
 
-      const response = (content: string) => {
-        return bot.helpers.sendMessage(message.channelId, {
-          content: `<@${message.authorId}> ${content}`,
+      bot.helpers.startTyping(channelId);
+
+      const response = (answer: string) => {
+        log.info("Sending response", { answer });
+
+        return bot.helpers.sendMessage(channelId, {
+          content: `<@${authorId}> ${answer}`,
         });
       };
 
-      if (!INITIAL_MENTION.test(message.content)) {
+      if (!INITIAL_MENTION.test(content)) {
         return response(
-          `Please @ me before your question like this: <@${bot.applicationId}> what is the meaning of life?`,
+          `Please @ me before your question like this: <@${DISCORD_CLIENT_ID}> what is the meaning of life?`,
         );
       }
 
-      const nonBotMentions = message.mentionedUserIds.filter((id) =>
+      const nonBotMentions = mentionedUserIds.filter((id) =>
         id !== DISCORD_CLIENT_ID
       );
 
@@ -63,7 +81,7 @@ const bot = createBot({
         );
       }
 
-      const question = message.content.replace(INITIAL_MENTION, "").trim();
+      const question = content.replace(INITIAL_MENTION, "").trim();
 
       if (!question) {
         return response("Don't @ me unless you have a question.");
@@ -75,16 +93,19 @@ const bot = createBot({
         );
       }
 
+      const stopTyping = continueTyping(channelId);
+
       const answer = await ask(
         question,
-        message.channelId,
-        message.member?.nick,
-      );
+        channelId,
+        log,
+        member?.nick,
+      ).finally(stopTyping);
 
       return response(answer);
     },
     ready() {
-      console.log("Successfully connected to gateway");
+      instanceLog.info("Successfully connected to gateway");
     },
   },
 });
@@ -92,6 +113,12 @@ const bot = createBot({
 await startBot(bot);
 
 serve({
-  "/": () => json({ ping: "pong" }),
-  404: () => json({ message: "Not Found" }),
+  "/": ({ referrer }) => {
+    instanceLog.info("Ping", { referrer });
+    return json({ ping: "pong" });
+  },
+  404: ({ url, referrer }) => {
+    instanceLog.info("404 Not found", { url, referrer });
+    return json({ message: "Not Found" });
+  },
 });
