@@ -9,7 +9,7 @@ import { ask } from "./openai.ts";
 import { redis } from "./redis.ts";
 import { createLog } from "./logger.ts";
 
-const AI_CURIOUS_ROLE_ID = 1098370802526724206n;
+const AI_CURIOUS_ROLE_IDS = [1098370802526724206n, 1123952489562132540n];
 const DISCORD_CLIENT_ID = BigInt(Deno.env.get("DISCORD_CLIENT_ID") as string);
 const DISCORD_TOKEN = Deno.env.get("DISCORD_TOKEN") as string;
 const INITIAL_MENTION = new RegExp(`^<@${DISCORD_CLIENT_ID}>[^A-Za-z0-9]*`);
@@ -34,7 +34,7 @@ const bot = createBot({
       const { id, authorId, channelId, content, member, mentionedUserIds } =
         msg;
 
-      if (!member?.roles?.includes(AI_CURIOUS_ROLE_ID)) {
+      if (!member?.roles?.some((role) => AI_CURIOUS_ROLE_IDS.includes(role))) {
         return;
       }
 
