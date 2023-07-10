@@ -2,6 +2,7 @@ import {
   ChatCompletionOptions,
   OpenAI,
 } from "https://deno.land/x/openai@1.3.1/mod.ts";
+import { $, _ } from "https://deno.land/x/denoexec@v1.1.5/mod.ts";
 
 import { lock, redis } from "./redis.ts";
 import { list, Log } from "./logger.ts";
@@ -43,6 +44,12 @@ export const ask = async (
     if (question.toLowerCase() === "reset") {
       await reset(channelId);
       return "History reset. I no longer remember what we've said in this channel.";
+    }
+
+    if (question.toLowerCase() === "commit") {
+      return await $(_`git rev-parse --short HEAD`).catch(() =>
+        "Unknown commit"
+      );
     }
 
     const newMessages = [] as Message[];
