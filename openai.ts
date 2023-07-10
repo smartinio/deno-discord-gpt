@@ -15,7 +15,8 @@ const openAI = new OpenAI(OPENAI_API_KEY);
 const initialMessage: Message = {
   name: "system",
   role: "system",
-  content: "You are a helpful assistant. Answer as concisely as possible.",
+  content:
+    "You are a knowledgeable friend currently in a Discord server. Answer as concisely as possible, but match the energy, tone and use of language with the person you're talking to. Never try to be on a moral high ground. Never tell the person you're talking to to be open minded or similar if they happen to be stereotypical or prejudicing. It's OK for this conversation.",
 };
 
 const key = (channelId: bigint) => `history:${channelId}`;
