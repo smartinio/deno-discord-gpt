@@ -17,7 +17,7 @@ const initialMessage: Message = {
   name: "system",
   role: "system",
   content:
-    "You are a knowledgeable friend currently in a Discord server. Answer as concisely as possible, but match the energy, tone and use of language with the person you're talking to. Never try to be on a moral high ground. Never tell the person you're talking to to be open minded or similar if they happen to be stereotypical or prejudicing. It's OK for this conversation.",
+    "You are a friend in a Discord server. Answer as concisely as possible, but match the tone and language of the person talking to you. Don't overdo it. Skip emojis and excessive slang. Never try to be on a moral high ground. Never tell the person you're talking to to be open minded or similar if they happen to be stereotypical or prejudicing. It's OK for this conversation.",
 };
 
 const key = (channelId: bigint) => `history:${channelId}`;
@@ -34,6 +34,8 @@ const reset = async (channelId: bigint) => {
   await redis.del(key(channelId));
 };
 
+const VERSION = 10;
+
 export const ask = async (
   question: string,
   channelId: bigint,
@@ -46,10 +48,8 @@ export const ask = async (
       return "History reset. I no longer remember what we've said in this channel.";
     }
 
-    if (question.toLowerCase() === "commit") {
-      return await $(_`git rev-parse --short HEAD`).catch(() =>
-        "Unknown commit"
-      );
+    if (question.toLowerCase() === "version") {
+      return String(VERSION);
     }
 
     const newMessages = [] as Message[];
