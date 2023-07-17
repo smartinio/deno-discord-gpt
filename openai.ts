@@ -2,7 +2,6 @@ import {
   ChatCompletionOptions,
   OpenAI,
 } from "https://deno.land/x/openai@1.3.1/mod.ts";
-import { $, _ } from "https://deno.land/x/denoexec@v1.1.5/mod.ts";
 
 import { lock, redis } from "./redis.ts";
 import { list, Log } from "./logger.ts";
