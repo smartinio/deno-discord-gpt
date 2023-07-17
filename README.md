@@ -12,4 +12,5 @@ Built as an excuse to try Deno/Deploy. Ran into some concurrency issues, so I ad
 ### Infra
 - [Deno Deploy](https://deno.com/deploy). Free tier
 - [Upstash](https://upstash.com) (redis). Free tier
+- [BetterStack](https://betterstack.com/logs) (logs). Free tier
 - [Freshping](https://www.freshworks.com/website-monitoring) to keep warm. Free tier
