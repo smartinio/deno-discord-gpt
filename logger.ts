@@ -1,25 +1,4 @@
-// deno-lint-ignore-file no-explicit-any
-// import { Logtail } from "https://esm.sh/@logtail/node@0.4.0";
-
-// temporary until Logtail works with Deno Deploy
-class Logtail {
-  private middleware: any[];
-
-  constructor(
-    private readonly token: string,
-    private readonly options: { batchInterval: number },
-  ) {
-    this.middleware = [];
-  }
-
-  info = (...args: any[]) => console.log(...args);
-  error = (...args: any[]) => console.error(...args);
-  debug = (...args: any[]) => console.debug(...args);
-
-  use = (fn: (payload: any) => Promise<any>) => {
-    this.middleware.push(fn);
-  };
-}
+import { Node as Logtail } from "https://esm.sh/@logtail/js@0.4.3";
 
 const LOGTAIL_SOURCE_TOKEN = Deno.env.get("LOGTAIL_SOURCE_TOKEN") as string;
 
