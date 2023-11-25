@@ -57,7 +57,7 @@ const bot = createBot({
 
       bot.helpers.startTyping(channelId);
 
-      const response = (answer: string) => {
+      const respond = (answer: string) => {
         log.info("Sending response", { answer });
 
         return bot.helpers.sendMessage(channelId, {
@@ -66,7 +66,7 @@ const bot = createBot({
       };
 
       if (!INITIAL_MENTION.test(content)) {
-        return response(
+        return respond(
           `Please @ me before your question like this: <@${DISCORD_CLIENT_ID}> what is the meaning of life?`,
         );
       }
@@ -76,7 +76,7 @@ const bot = createBot({
       );
 
       if (nonBotMentions.length > 0) {
-        return response(
+        return respond(
           "Don't @ anyone else when talking to me, please.",
         );
       }
@@ -84,25 +84,29 @@ const bot = createBot({
       const question = content.replace(INITIAL_MENTION, "").trim();
 
       if (!question) {
-        return response("Don't @ me unless you have a question.");
+        return respond("Don't @ me unless you have a question.");
       }
 
       if (MIDWAY_MENTION.test(question)) {
-        return response(
+        return respond(
           "Don't @ me multiple times, please.",
         );
       }
 
       const stopTyping = continueTyping(channelId);
 
-      const answer = await ask(
-        question,
-        channelId,
-        log,
-        member?.nick,
-      ).finally(stopTyping);
+      try {
+        const answer = await ask(
+          question,
+          channelId,
+          log,
+        ).finally(stopTyping);
 
-      return response(answer);
+        return respond(answer);
+      } catch (error: unknown) {
+        log.error("Error", { message: (error as Error).message });
+        return respond("Something went wrong 😢 Please try again!");
+      }
     },
     ready() {
       instanceLog.info("Successfully connected to gateway");
