@@ -66,7 +66,7 @@ export const ask = async (
 
     log.info("Querying OpenAI", {
       channelId: String(channelId),
-      messages: messages.join("\n"),
+      messages: messages.map((m) => m.content).join("\n\n"),
     });
 
     const answer = await openAI.chat.completions.create({
