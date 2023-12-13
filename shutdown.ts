@@ -25,3 +25,20 @@ for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"] as const) {
     Deno.exit(0);
   });
 }
+
+let stalled = false;
+
+globalThis.addEventListener("beforeunload", (e) => {
+  if (stalled) {
+    instanceLog.info("Exiting beforeunload. Already stalled once.");
+    return;
+  }
+
+  e.preventDefault();
+
+  instanceLog.info("Stalling beforeunload");
+
+  setTimeout(() => {
+    stalled = true;
+  }, 2000);
+});
