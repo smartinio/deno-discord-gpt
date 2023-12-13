@@ -20,5 +20,5 @@ export const list = <T>(array: T[]) =>
       acc[index] = message;
       return acc;
     },
-    {} as Record<number, T>,
+    {} as Record<string, T>,
   );

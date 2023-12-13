@@ -36,7 +36,7 @@ const reset = async (channelId: bigint) => {
   await redis.del(key(channelId));
 };
 
-const VERSION = 13;
+const VERSION = 14;
 
 export const ask = async (
   question: string,
@@ -66,7 +66,7 @@ export const ask = async (
 
     log.info("Querying OpenAI", {
       channelId: String(channelId),
-      messages: messages.map((m) => m.content).join("\n\n"),
+      messages: JSON.stringify(messages.map((m) => m.content)),
     });
 
     const answer = await openAI.chat.completions.create({
@@ -76,7 +76,8 @@ export const ask = async (
 
     const [reply] = answer.choices;
 
-    if (answer.usage?.total_tokens ?? 0 > 3500) {
+    if ((answer.usage?.total_tokens ?? 0) > 3500) {
+      log.info("Reset due to usage", { ...answer.usage });
       await reset(channelId);
     } else {
       await remember(channelId, ...newMessages, reply.message);

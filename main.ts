@@ -8,6 +8,7 @@ import {
 import { ask } from "./openai.ts";
 import { redis } from "./redis.ts";
 import { createLog } from "./logger.ts";
+import { shutdown } from "./shutdown.ts";
 
 const AI_CURIOUS_ROLE_IDS = [1098370802526724206n, 1123952489562132540n];
 const DISCORD_CLIENT_ID = BigInt(Deno.env.get("DISCORD_CLIENT_ID") as string);
@@ -44,12 +45,17 @@ const bot = createBot({
 
       const messageId = String(id);
 
-      const taskStatus = await acquireTask(messageId);
-
       const log = createLog({ messageId });
 
+      if (shutdown.imminent) {
+        log.info("Shutdown imminent, skipping message");
+        return shutdown.allow();
+      }
+
+      const taskStatus = await acquireTask(messageId);
+
       if (taskStatus !== "OK") {
-        log.info("Message already being processed");
+        log.info("Message already being processed", { taskStatus });
         return;
       }
 
@@ -57,12 +63,14 @@ const bot = createBot({
 
       bot.helpers.startTyping(channelId);
 
-      const respond = (answer: string) => {
+      const respond = async (answer: string) => {
         log.info("Sending response", { answer });
 
-        return bot.helpers.sendMessage(channelId, {
+        await bot.helpers.sendMessage(channelId, {
           content: `<@${authorId}> ${answer}`,
         });
+
+        shutdown.allow();
       };
 
       if (!INITIAL_MENTION.test(content)) {
