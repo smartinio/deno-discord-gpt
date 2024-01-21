@@ -55,6 +55,7 @@ const bot = createBot({
       const taskStatus = await acquireTask(messageId);
 
       if (taskStatus !== "OK") {
+        if (shutdown.imminent) shutdown.allow();
         return;
       }
 
