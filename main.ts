@@ -116,9 +116,6 @@ const bot = createBot({
         return respond("Something went wrong 😢 Please try again!");
       }
     },
-    ready() {
-      instanceLog.info("Successfully connected to gateway");
-    },
   },
 });
 
@@ -126,7 +123,6 @@ await startBot(bot);
 
 serve({
   "/": ({ referrer }) => {
-    instanceLog.info("Ping", { referrer });
     return json({ ping: "pong" });
   },
   404: ({ url, referrer }) => {
