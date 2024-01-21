@@ -55,7 +55,6 @@ const bot = createBot({
       const taskStatus = await acquireTask(messageId);
 
       if (taskStatus !== "OK") {
-        log.info("Message already being processed", { taskStatus });
         return;
       }
 
