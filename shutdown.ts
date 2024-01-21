@@ -1,3 +1,4 @@
+import { gracefulShutdown } from "https://deno.land/x/easy_std@v0.7.1/mod.ts";
 import { createLog } from "./logger.ts";
 
 let resolve: (v: "work") => void;
@@ -16,29 +17,9 @@ export const shutdown = {
 const sleep = (ms: number) =>
   new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), ms));
 
-for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"] as const) {
-  Deno.addSignalListener(signal, async () => {
-    instanceLog.info("Shutdown signal received", { signal });
-    shutdown.imminent = true;
-    const race = await Promise.race([sleep(30000), pendingWorkPromise]);
-    instanceLog.info("Exiting", { signal, race });
-    Deno.exit(0);
-  });
-}
-
-let stalled = false;
-
-globalThis.addEventListener("beforeunload", (e) => {
-  if (stalled) {
-    instanceLog.info("Exiting beforeunload. Already stalled once.");
-    return;
-  }
-
-  e.preventDefault();
-
-  instanceLog.info("Stalling beforeunload");
-
-  setTimeout(() => {
-    stalled = true;
-  }, 2000);
+gracefulShutdown(async (type) => {
+  instanceLog.info("Shutdown signal received", { type });
+  shutdown.imminent = true;
+  const race = await Promise.race([sleep(30000), pendingWorkPromise]);
+  instanceLog.info("Exiting", { type, race });
 });
