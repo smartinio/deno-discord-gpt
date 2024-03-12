@@ -113,6 +113,10 @@ const bot = createBot({
         return respond(answer);
       } catch (error: unknown) {
         log.error("Error", { message: (error as Error).message });
+        try {
+          // @ts-ignore
+          log.error(error);
+        } catch {}
         return respond("Something went wrong 😢 Please try again!");
       }
     },
