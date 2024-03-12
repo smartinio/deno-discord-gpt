@@ -1,4 +1,4 @@
-import { OpenAI } from "https://deno.land/x/openai@v4.20.0/mod.ts";
+import { OpenAI } from "https://deno.land/x/openai@v4.28.4/mod.ts";
 
 import { lock, redis } from "./redis.ts";
 import { Log } from "./logger.ts";
