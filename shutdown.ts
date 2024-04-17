@@ -22,4 +22,5 @@ gracefulShutdown(async (type) => {
   shutdown.imminent = true;
   const race = await Promise.race([sleep(30000), pendingWorkPromise]);
   instanceLog.info("Exiting", { type, race });
+  Deno.exit();
 });
