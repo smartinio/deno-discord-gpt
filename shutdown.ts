@@ -17,6 +17,10 @@ export const shutdown = {
 const sleep = (ms: number) =>
   new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), ms));
 
+globalThis.addEventListener("unhandledrejection", (e) => {
+  instanceLog.error("Unhandled rejection:", e.reason);
+});
+
 gracefulShutdown(async (type) => {
   instanceLog.info("Shutdown signal received", { type });
   shutdown.imminent = true;
