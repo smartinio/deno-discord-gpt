@@ -59,7 +59,7 @@ const bot = createBot({
         return;
       }
 
-      log.info("Processing message", { content });
+      log.info("Processing message", { content, att: msg.attachments });
 
       bot.helpers.startTyping(channelId);
 
