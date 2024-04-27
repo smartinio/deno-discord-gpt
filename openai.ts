@@ -38,11 +38,17 @@ const reset = async (channelId: bigint) => {
 
 const VERSION = 16;
 
-export const ask = async (
-  question: string,
-  channelId: bigint,
-  log: Log,
-): Promise<string> => {
+export const ask = async ({
+  question,
+  channelId,
+  log,
+  imageUrls,
+}: {
+  question: string;
+  channelId: bigint;
+  log: Log;
+  imageUrls?: string[];
+}): Promise<string> => {
   return await lock(channelId, log, async () => {
     if (question.toLowerCase() === "reset") {
       await reset(channelId);
@@ -60,7 +66,16 @@ export const ask = async (
       newMessages.push(initialMessage);
     }
 
-    newMessages.push({ role: "user", content: question });
+    const content: Message["content"] = [{ type: "text", text: question }];
+
+    if (imageUrls?.length) {
+      content.push(...imageUrls.map((url) => ({
+        type: "image_url",
+        image_url: { url, detail: "low" },
+      } as const)));
+    }
+
+    newMessages.push({ role: "user", content });
 
     const messages = history.concat(newMessages);
 
@@ -70,7 +85,7 @@ export const ask = async (
     });
 
     const answer = await openAI.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-4-turbo",
       messages,
     });
 

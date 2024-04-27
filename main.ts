@@ -27,6 +27,16 @@ const continueTyping = (channelId: bigint) => {
   return () => clearInterval(interval);
 };
 
+// We currently support PNG (.png), JPEG (.jpeg and .jpg), WEBP (.webp), and non-animated GIF (.gif).
+const supportedContentTypes = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+];
+
+const MAX_IMAGE_SIZE = { width: 512, height: 512 };
+
 const bot = createBot({
   token: DISCORD_TOKEN,
   intents: Intents.GuildMessages | Intents.MessageContent,
@@ -73,6 +83,16 @@ const bot = createBot({
         shutdown.allow();
       };
 
+      if (
+        msg.attachments.some((attachment) =>
+          !supportedContentTypes.includes(attachment.contentType!)
+        )
+      ) {
+        return respond(
+          "Only PNG, JPEG, WEBP, and GIF images are supported at the moment.",
+        );
+      }
+
       if (!INITIAL_MENTION.test(content)) {
         return respond(
           `Please @ me before your question like this: <@${DISCORD_CLIENT_ID}> what is the meaning of life?`,
@@ -90,6 +110,7 @@ const bot = createBot({
       }
 
       const question = content.replace(INITIAL_MENTION, "").trim();
+      const imageUrls = msg.attachments.map((a) => a.url);
 
       if (!question) {
         return respond("Don't @ me unless you have a question.");
@@ -104,11 +125,12 @@ const bot = createBot({
       const stopTyping = continueTyping(channelId);
 
       try {
-        const answer = await ask(
+        const answer = await ask({
           question,
           channelId,
           log,
-        ).finally(stopTyping);
+          imageUrls,
+        }).finally(stopTyping);
 
         return respond(answer);
       } catch (error: unknown) {
