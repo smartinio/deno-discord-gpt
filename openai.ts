@@ -36,7 +36,7 @@ const reset = async (channelId: bigint) => {
   await redis.del(key(channelId));
 };
 
-const VERSION = 16;
+const VERSION = 18;
 
 export const ask = async ({
   question,
@@ -60,24 +60,48 @@ export const ask = async ({
     }
 
     const newMessages = [] as Message[];
-    const history = await getHistory(channelId);
+    const rawHistory = await getHistory(channelId);
 
-    if (history.length === 0) {
+    if (rawHistory.length === 0) {
       newMessages.push(initialMessage);
     }
+
+    // Prevent past images from being re-parsed (also links expire)
+    const history = rawHistory.map((message) => {
+      if (message.role !== "user" || !Array.isArray(message.content)) {
+        return message;
+      }
+
+      return {
+        ...message,
+        content: message.content.map(
+          (content) => {
+            if (content.type === "image_url") {
+              return {
+                type: "text",
+                text: `[expired image link](${content.image_url.url})`,
+              } as const;
+            }
+            return content;
+          },
+        ),
+      };
+    });
 
     const content: Message["content"] = [{ type: "text", text: question }];
 
     if (imageUrls?.length) {
-      content.push(...imageUrls.map((url) => ({
+      const images = imageUrls.map((url) => ({
         type: "image_url",
         image_url: { url, detail: "low" },
-      } as const)));
+      } as const));
+
+      content.push(...images);
     }
 
     newMessages.push({ role: "user", content });
 
-    const messages = history.concat(newMessages);
+    const messages = [...history, ...newMessages];
 
     log.info("Querying OpenAI", {
       channelId: String(channelId),
@@ -90,6 +114,8 @@ export const ask = async ({
     });
 
     const [reply] = answer.choices;
+
+    log.info("Usage", { total_tokens: answer.usage?.total_tokens });
 
     if ((answer.usage?.total_tokens ?? 0) > 3500) {
       log.info("Reset due to usage", { ...answer.usage });

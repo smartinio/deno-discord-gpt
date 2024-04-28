@@ -27,15 +27,12 @@ const continueTyping = (channelId: bigint) => {
   return () => clearInterval(interval);
 };
 
-// We currently support PNG (.png), JPEG (.jpeg and .jpg), WEBP (.webp), and non-animated GIF (.gif).
 const supportedContentTypes = [
   "image/png",
   "image/jpeg",
   "image/webp",
   "image/gif",
 ];
-
-const MAX_IMAGE_SIZE = { width: 512, height: 512 };
 
 const bot = createBot({
   token: DISCORD_TOKEN,
@@ -55,7 +52,7 @@ const bot = createBot({
 
       const messageId = String(id);
 
-      const log = createLog({ messageId });
+      const log = createLog({ messageId, from: msg.member?.nick });
 
       if (shutdown.imminent) {
         log.info("Shutdown imminent, skipping message");
