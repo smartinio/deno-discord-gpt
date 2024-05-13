@@ -51,18 +51,9 @@ const bot = createBot({
         type,
       } = msg;
 
-      if (type === MessageTypes.Reply) {
-        instanceLog.info("Ignoring reply", { msg });
-        return;
-      }
-
-      if (!mentionedUserIds.includes(DISCORD_CLIENT_ID)) {
-        return;
-      }
-
-      if (authorId === DISCORD_CLIENT_ID) {
-        return;
-      }
+      if (authorId === DISCORD_CLIENT_ID) return;
+      if (type === MessageTypes.Reply) return;
+      if (!mentionedUserIds.includes(DISCORD_CLIENT_ID)) return;
 
       const messageId = String(id);
 

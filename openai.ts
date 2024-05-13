@@ -36,7 +36,7 @@ const reset = async (channelId: bigint) => {
   await redis.del(key(channelId));
 };
 
-const VERSION = 20;
+const VERSION = 21;
 
 export const ask = async ({
   question,
