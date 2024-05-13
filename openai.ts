@@ -79,7 +79,7 @@ export const ask = async ({
             if (content.type === "image_url") {
               return {
                 type: "text",
-                text: `[expired image link](${content.image_url.url})`,
+                text: "[expired image link]",
               } as const;
             }
             return content;
@@ -117,13 +117,17 @@ export const ask = async ({
 
     log.info("Usage", { total_tokens: answer.usage?.total_tokens });
 
+    let extra = "";
+
     if ((answer.usage?.total_tokens ?? 0) > 3500) {
+      extra =
+        "\n\nBy the way. My brain just reached its limit, so I forgot everything we talked about. I hope you understand... 💔";
       log.info("Reset due to usage", { ...answer.usage });
       await reset(channelId);
     } else {
       await remember(channelId, ...newMessages, reply.message);
     }
 
-    return reply.message.content ?? "No response from OpenAI 🤷‍♂️";
+    return (reply.message.content ?? "No response from OpenAI 🤷‍♂️") + extra;
   });
 };

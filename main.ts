@@ -9,6 +9,7 @@ import { ask } from "./openai.ts";
 import { redis } from "./redis.ts";
 import { createLog } from "./logger.ts";
 import { shutdown } from "./shutdown.ts";
+import { retry } from "./retry.ts";
 
 const AI_CURIOUS_ROLE_IDS = [1098370802526724206n, 1123952489562132540n];
 const DISCORD_CLIENT_ID = BigInt(Deno.env.get("DISCORD_CLIENT_ID") as string);
@@ -42,10 +43,6 @@ const bot = createBot({
       const { id, authorId, channelId, content, member, mentionedUserIds } =
         msg;
 
-      if (!member?.roles?.some((role) => AI_CURIOUS_ROLE_IDS.includes(role))) {
-        return;
-      }
-
       if (!mentionedUserIds.includes(DISCORD_CLIENT_ID)) {
         return;
       }
@@ -73,12 +70,26 @@ const bot = createBot({
       const respond = async (answer: string) => {
         log.info("Sending response", { answer });
 
-        await bot.helpers.sendMessage(channelId, {
-          content: `<@${authorId}> ${answer}`,
-        });
+        try {
+          await retry(() =>
+            bot.helpers.sendMessage(channelId, {
+              content: `<@${authorId}> ${answer}`,
+            })
+          );
+        } catch (error: unknown) {
+          log.error("Failed sending response to Discord", {
+            message: (error as Error).message,
+          });
+        }
 
         shutdown.allow();
       };
+
+      if (!member?.roles?.some((role) => AI_CURIOUS_ROLE_IDS.includes(role))) {
+        return respond(
+          "Sorry, you need the `ai-curious` role to talk to me.",
+        );
+      }
 
       if (
         msg.attachments.some((attachment) =>
