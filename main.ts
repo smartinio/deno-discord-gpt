@@ -2,6 +2,7 @@ import { json, serve } from "https://deno.land/x/sift@0.6.0/mod.ts";
 import {
   createBot,
   Intents,
+  MessageTypes,
   startBot,
 } from "https://deno.land/x/discordeno@13.0.0/mod.ts";
 
@@ -40,8 +41,20 @@ const bot = createBot({
   intents: Intents.GuildMessages | Intents.MessageContent,
   events: {
     async messageCreate(bot, msg) {
-      const { id, authorId, channelId, content, member, mentionedUserIds } =
-        msg;
+      const {
+        id,
+        authorId,
+        channelId,
+        content,
+        member,
+        mentionedUserIds,
+        type,
+      } = msg;
+
+      if (type === MessageTypes.Reply) {
+        instanceLog.info("Ignoring reply", { msg });
+        return;
+      }
 
       if (!mentionedUserIds.includes(DISCORD_CLIENT_ID)) {
         return;
