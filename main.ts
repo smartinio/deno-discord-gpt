@@ -47,6 +47,10 @@ const bot = createBot({
         return;
       }
 
+      if (authorId === DISCORD_CLIENT_ID) {
+        return;
+      }
+
       const messageId = String(id);
 
       const log = createLog({ messageId, from: msg.member?.nick });
