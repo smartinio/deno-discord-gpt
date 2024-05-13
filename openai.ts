@@ -36,7 +36,7 @@ const reset = async (channelId: bigint) => {
   await redis.del(key(channelId));
 };
 
-const VERSION = 18;
+const VERSION = 20;
 
 export const ask = async ({
   question,
@@ -109,7 +109,7 @@ export const ask = async ({
     });
 
     const answer = await openAI.chat.completions.create({
-      model: "gpt-4-turbo",
+      model: "gpt-4o",
       messages,
     });
 
