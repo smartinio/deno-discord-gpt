@@ -17,14 +17,18 @@ export const shutdown = {
 const sleep = (ms: number) =>
   new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), ms));
 
-globalThis.addEventListener("unhandledrejection", (e) => {
+globalThis.addEventListener("unhandledrejection", async (e) => {
   instanceLog.error("Unhandled rejection:", e.reason);
+  shutdown.imminent = true;
+  const race = await Promise.race([sleep(30000), pendingWorkPromise]);
+  instanceLog.info("Exiting in unhandled rejection", { race });
+  Deno.exit();
 });
 
 gracefulShutdown(async (type) => {
   instanceLog.info("Shutdown signal received", { type });
   shutdown.imminent = true;
   const race = await Promise.race([sleep(30000), pendingWorkPromise]);
-  instanceLog.info("Exiting", { type, race });
+  instanceLog.info("Exiting in graceful shutdown", { type, race });
   Deno.exit();
 });

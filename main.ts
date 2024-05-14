@@ -75,12 +75,24 @@ const bot = createBot({
 
       bot.helpers.startTyping(channelId);
 
-      const respond = async (answer: string) => {
-        log.info("Sending response", { answer });
+      const respond = async (
+        response: string | { answer: string; imageUrl?: string },
+        { finished = true }: { finished?: boolean } = {},
+      ) => {
+        log.info("Sending response", { response });
+
+        const embeds = typeof response !== "string" && response.imageUrl
+          ? [{ image: { url: response.imageUrl } }]
+          : undefined;
+
+        const answer = typeof response === "string"
+          ? response
+          : response.answer;
 
         try {
           await retry(() =>
             bot.helpers.sendMessage(channelId, {
+              embeds,
               content: `<@${authorId}> ${answer}`,
             })
           );
@@ -90,7 +102,7 @@ const bot = createBot({
           });
         }
 
-        shutdown.allow();
+        if (finished) shutdown.allow();
       };
 
       if (!member?.roles?.some((role) => AI_CURIOUS_ROLE_IDS.includes(role))) {
@@ -146,15 +158,20 @@ const bot = createBot({
           channelId,
           log,
           imageUrls,
+          notify: (m) => respond(m, { finished: false }),
         }).finally(stopTyping);
 
         return respond(answer);
       } catch (error: unknown) {
         log.error("Error", { message: (error as Error).message });
+
         try {
-          // @ts-ignore
+          // @ts-ignore: logging raw errors may not be supported
           log.error(error);
-        } catch {}
+        } catch {
+          // don't care about this
+        }
+
         return respond("Something went wrong 😢 Please try again!");
       }
     },
@@ -164,7 +181,7 @@ const bot = createBot({
 await startBot(bot);
 
 serve({
-  "/": ({ referrer }) => {
+  "/": () => {
     return json({ ping: "pong" });
   },
   404: ({ url, referrer }) => {

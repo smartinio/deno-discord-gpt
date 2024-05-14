@@ -3,11 +3,13 @@ import { OpenAI } from "https://deno.land/x/openai@v4.28.4/mod.ts";
 import { lock, redis } from "./redis.ts";
 import { Log } from "./logger.ts";
 
-type ChatCompletionOptions = Parameters<
-  OpenAI["chat"]["completions"]["create"]
->[0];
+import type {
+  ChatCompletionCreateParams,
+  ChatCompletionTool,
+  ImagesResponse,
+} from "https://deno.land/x/openai@v4.28.4/resources/mod.ts";
 
-type Message = ChatCompletionOptions["messages"][number];
+type Message = ChatCompletionCreateParams["messages"][number];
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") as string;
 
@@ -36,19 +38,52 @@ const reset = async (channelId: bigint) => {
   await redis.del(key(channelId));
 };
 
-const VERSION = 21;
+const VERSION = 22;
+
+const openai_images_generate = {
+  type: "function",
+  function: {
+    name: "openai_images_generate",
+    description: "Generate an image with DALL-E 3",
+    parameters: {
+      type: "object",
+      properties: {
+        prompt: {
+          type: "string",
+        },
+        style: {
+          type: "string",
+          enum: ["vivid", "natural"],
+        },
+      },
+      required: ["prompt"],
+      additionalProperties: false,
+    },
+  },
+} as const satisfies ChatCompletionTool;
+
+const validateGenerateImageArguments = (
+  data: unknown,
+): data is { prompt: string; style: "vivid" | "natural" } => {
+  return data !== null && typeof data === "object" && "prompt" in data &&
+      "style" in data
+    ? (data.style === "vivid" || data.style === "natural")
+    : true;
+};
 
 export const ask = async ({
   question,
   channelId,
   log,
   imageUrls,
+  notify,
 }: {
   question: string;
   channelId: bigint;
   log: Log;
   imageUrls?: string[];
-}): Promise<string> => {
+  notify: (message: string) => void;
+}): Promise<string | { answer: string; imageUrl?: string }> => {
   return await lock(channelId, log, async () => {
     if (question.toLowerCase() === "reset") {
       await reset(channelId);
@@ -111,9 +146,42 @@ export const ask = async ({
     const answer = await openAI.chat.completions.create({
       model: "gpt-4o",
       messages,
+      tools: [openai_images_generate],
     });
 
     const [reply] = answer.choices;
+
+    const toolCall = reply.message.tool_calls?.at(0);
+
+    let imagesResponse: ImagesResponse | undefined;
+
+    if (toolCall?.function.name === openai_images_generate.function.name) {
+      const args = JSON.parse(toolCall.function.arguments);
+
+      if (!validateGenerateImageArguments(args)) {
+        log.error("Invalid arguments from OpenAI", { args });
+
+        return "Sorry, couldn't generate your image. Please try again.";
+      }
+
+      const { prompt, style } = args;
+
+      log.info("Generating image", {
+        channelId: String(channelId),
+        prompt,
+        style,
+      });
+
+      notify("Generating image. Might take a while...");
+
+      imagesResponse = await openAI.images.generate({
+        prompt,
+        model: "dall-e-3",
+        quality: "hd",
+        n: 1,
+        style,
+      });
+    }
 
     log.info("Usage", { total_tokens: answer.usage?.total_tokens });
 
@@ -124,8 +192,15 @@ export const ask = async ({
         "\n\nBy the way. My brain just reached its limit, so I forgot everything we talked about. I hope you understand... 💔";
       log.info("Reset due to usage", { ...answer.usage });
       await reset(channelId);
-    } else {
+    } else if (!imagesResponse) {
       await remember(channelId, ...newMessages, reply.message);
+    }
+
+    if (imagesResponse) {
+      return {
+        imageUrl: imagesResponse.data[0].url,
+        answer: extra,
+      };
     }
 
     return (reply.message.content ?? "No response from OpenAI 🤷‍♂️") + extra;
