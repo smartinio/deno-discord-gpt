@@ -84,7 +84,7 @@ export const ask = async ({
   imageUrls?: string[];
   notify: (message: string) => void;
 }): Promise<string | { answer: string; imageUrl?: string }> => {
-  return await lock(channelId, log, async () => {
+  return await lock(channelId, async () => {
     if (question.toLowerCase() === "reset") {
       await reset(channelId);
       return "History reset. I no longer remember what we've said in this channel.";

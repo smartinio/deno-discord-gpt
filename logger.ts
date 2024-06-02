@@ -17,10 +17,6 @@ export const createLog = <T>(extra?: T) => {
 };
 
 export const list = <T>(array: T[]) =>
-  array.reduce(
-    (acc, message, index) => {
-      acc[index] = message;
-      return acc;
-    },
-    {} as Record<string, T>,
+  Object.fromEntries(
+    array.map((message, idx) => [String(idx), message]),
   );

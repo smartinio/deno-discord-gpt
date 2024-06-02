@@ -159,9 +159,9 @@ const bot = createBot({
           log,
           imageUrls,
           notify: (m) => respond(m, { finished: false }),
-        }).finally(stopTyping);
+        });
 
-        return respond(answer);
+        return await respond(answer);
       } catch (error: unknown) {
         log.error("Error", { message: (error as Error).message });
 
@@ -172,7 +172,9 @@ const bot = createBot({
           // don't care about this
         }
 
-        return respond("Something went wrong 😢 Please try again!");
+        return await respond("Something went wrong 😢 Please try again!");
+      } finally {
+        stopTyping();
       }
     },
   },
