@@ -98,7 +98,7 @@ const bot = createBot({
           );
         } catch (error: unknown) {
           log.error("Failed sending response to Discord", {
-            message: (error as Error).message,
+            errorMessage: (error as Error).message,
           });
         }
 
@@ -163,7 +163,7 @@ const bot = createBot({
 
         return await respond(answer);
       } catch (error: unknown) {
-        log.error("Error", { message: (error as Error).message });
+        log.error("Error", { errorMessage: (error as Error).message });
 
         try {
           // @ts-ignore: logging raw errors may not be supported
