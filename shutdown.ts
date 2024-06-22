@@ -14,13 +14,16 @@ export const shutdown = {
   },
 };
 
+const isDev = Deno.env.get("LOCAL_DEV") === "true";
+const delay = isDev ? 0 : 30000;
+
 const sleep = (ms: number) =>
   new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), ms));
 
 globalThis.addEventListener("unhandledrejection", async (e) => {
   instanceLog.error("Unhandled rejection:", e.reason);
   shutdown.imminent = true;
-  const race = await Promise.race([sleep(30000), pendingWorkPromise]);
+  const race = await Promise.race([sleep(delay), pendingWorkPromise]);
   instanceLog.info("Exiting in unhandled rejection", { race });
   Deno.exit();
 });
@@ -28,7 +31,7 @@ globalThis.addEventListener("unhandledrejection", async (e) => {
 gracefulShutdown(async (type) => {
   instanceLog.info("Shutdown signal received", { type });
   shutdown.imminent = true;
-  const race = await Promise.race([sleep(30000), pendingWorkPromise]);
+  const race = await Promise.race([sleep(delay), pendingWorkPromise]);
   instanceLog.info("Exiting in graceful shutdown", { type, race });
   Deno.exit();
 });

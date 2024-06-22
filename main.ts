@@ -6,16 +6,19 @@ import {
   startBot,
 } from "https://deno.land/x/discordeno@13.0.0/mod.ts";
 
-import { ask } from "./openai.ts";
+import * as anthropic from "./anthropic.ts";
+import * as openai from "./openai.ts";
 import { redis } from "./redis.ts";
 import { createLog } from "./logger.ts";
 import { shutdown } from "./shutdown.ts";
 import { retry } from "./retry.ts";
+import { ContentType, supportedContentTypes } from "./ai.ts";
 
+// todo: Don't hardcode these role ids
 const AI_CURIOUS_ROLE_IDS = [1098370802526724206n, 1123952489562132540n];
 const DISCORD_CLIENT_ID = BigInt(Deno.env.get("DISCORD_CLIENT_ID") as string);
 const DISCORD_TOKEN = Deno.env.get("DISCORD_TOKEN") as string;
-const INITIAL_MENTION = new RegExp(`^<@${DISCORD_CLIENT_ID}>[^A-Za-z0-9]*`);
+const INITIAL_MENTION = new RegExp(`^<@${DISCORD_CLIENT_ID}>\s*`);
 const MIDWAY_MENTION = new RegExp(`<@${DISCORD_CLIENT_ID}>`);
 
 const instanceLog = createLog();
@@ -29,12 +32,22 @@ const continueTyping = (channelId: bigint) => {
   return () => clearInterval(interval);
 };
 
-const supportedContentTypes = [
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/gif",
-];
+const isDev = Deno.env.get("LOCAL_DEV") === "true";
+
+type Provider = "openai" | "anthropic";
+
+const setProvider = async (
+  channelId: bigint,
+  provider: Provider,
+) => {
+  return await redis.set("provider:" + channelId, provider);
+};
+
+const getProvider = async (channelId: bigint): Promise<Provider> => {
+  return await redis.get("provider:" + channelId) || "openai" as Provider;
+};
+
+const deployment = new Date().toISOString();
 
 const bot = createBot({
   token: DISCORD_TOKEN,
@@ -45,7 +58,6 @@ const bot = createBot({
         id,
         authorId,
         channelId,
-        content,
         member,
         mentionedUserIds,
         type,
@@ -53,7 +65,14 @@ const bot = createBot({
 
       if (authorId === DISCORD_CLIENT_ID) return;
       if (type === MessageTypes.Reply) return;
-      if (!mentionedUserIds.includes(DISCORD_CLIENT_ID)) return;
+      if (!isDev && !mentionedUserIds.includes(DISCORD_CLIENT_ID)) return;
+      if (isDev && !msg.content.startsWith("!dev ")) return;
+
+      if (isDev) {
+        msg.content = msg.content.replace(/^!dev /, "");
+      }
+
+      const { content } = msg;
 
       const messageId = String(id);
 
@@ -113,7 +132,9 @@ const bot = createBot({
 
       if (
         msg.attachments.some((attachment) =>
-          !supportedContentTypes.includes(attachment.contentType!)
+          !supportedContentTypes.includes(
+            attachment.contentType! as ContentType,
+          )
         )
       ) {
         return respond(
@@ -121,7 +142,7 @@ const bot = createBot({
         );
       }
 
-      if (!INITIAL_MENTION.test(content)) {
+      if (!isDev && !INITIAL_MENTION.test(content)) {
         return respond(
           `Please @ me before your question like this: <@${DISCORD_CLIENT_ID}> what is the meaning of life?`,
         );
@@ -138,7 +159,36 @@ const bot = createBot({
       }
 
       const question = content.replace(INITIAL_MENTION, "").trim();
-      const imageUrls = msg.attachments.map((a) => a.url);
+
+      if (question === "deployment") {
+        return respond(deployment);
+      }
+
+      if (question.startsWith("!provider ")) {
+        const provider = ((): Provider | undefined => {
+          if (msg.content.includes("openai")) return "openai";
+          if (msg.content.includes("anthropic")) return "anthropic";
+        })();
+
+        if (!provider) {
+          return respond("Please specify a valid provider (openai, anthropic)");
+        }
+
+        const didSet = await setProvider(channelId, provider);
+
+        if (!didSet) {
+          return respond("Failed to set provider. Please try again later.");
+        }
+
+        return respond(`This channel is now using ${provider}`);
+      }
+
+      log.info("Question", { question });
+
+      const images = msg.attachments.map(({ url, contentType }) => ({
+        url,
+        contentType: contentType as ContentType,
+      }));
 
       if (!question) {
         return respond("Don't @ me unless you have a question.");
@@ -150,14 +200,21 @@ const bot = createBot({
         );
       }
 
+      const provider = await getProvider(channelId);
+
+      const ai = ({
+        openai,
+        anthropic,
+      })[provider];
+
       const stopTyping = continueTyping(channelId);
 
       try {
-        const answer = await ask({
+        const answer = await ai.ask({
           question,
           channelId,
           log,
-          imageUrls,
+          images,
           notify: (m) => respond(m, { finished: false }),
         });
 

@@ -1,7 +1,8 @@
 import { OpenAI } from "https://deno.land/x/openai@v4.28.4/mod.ts";
 
-import { lock, redis } from "./redis.ts";
-import { Log } from "./logger.ts";
+import { lock } from "./redis.ts";
+
+import { type AskAI, createCache } from "./ai.ts";
 
 import type {
   ChatCompletionCreateParams,
@@ -24,21 +25,9 @@ const initialMessage: Message = {
     "You are an assistant in a Discord channel. Answer as concisely as possible, but match the tone and language of the person talking to you. Don't overdo it. Skip emojis and excessive slang. Never try to be on a moral high ground. Don't censor profanity. Never tell the person you're talking to to be open minded or similar if they happen to be stereotypical or prejudicing. It's OK for this conversation.",
 };
 
-const key = (channelId: bigint) => `history:${channelId}`;
+const { getHistory, remember, reset } = createCache<Message>("openai");
 
-const getHistory = async (channelId: bigint) => {
-  return await redis.lrange(key(channelId), 0, -1) as Message[];
-};
-
-const remember = async (channelId: bigint, ...messages: Message[]) => {
-  await redis.rpush(key(channelId), ...messages);
-};
-
-const reset = async (channelId: bigint) => {
-  await redis.del(key(channelId));
-};
-
-const VERSION = 22;
+const VERSION = "openai.v2";
 
 const openai_images_generate = {
   type: "function",
@@ -75,15 +64,9 @@ export const ask = async ({
   question,
   channelId,
   log,
-  imageUrls,
+  images,
   notify,
-}: {
-  question: string;
-  channelId: bigint;
-  log: Log;
-  imageUrls?: string[];
-  notify: (message: string) => void;
-}): Promise<string | { answer: string; imageUrl?: string }> => {
+}: AskAI): Promise<string | { answer: string; imageUrl?: string }> => {
   return await lock(channelId, async () => {
     if (question.toLowerCase() === "reset") {
       await reset(channelId);
@@ -124,6 +107,8 @@ export const ask = async ({
     });
 
     const content: Message["content"] = [{ type: "text", text: question }];
+
+    const imageUrls = images?.map(({ url }) => url);
 
     if (imageUrls?.length) {
       const images = imageUrls.map((url) => ({
