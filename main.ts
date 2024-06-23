@@ -237,6 +237,9 @@ const bot = createBot({
 await startBot(bot);
 
 serve({
+  "/deployment-id": () => {
+    return json({ deploymentId: Deno.env.get("DENO_DEPLOYMENT_ID") as string });
+  },
   "/": () => {
     return json({ ping: "pong" });
   },

@@ -1,0 +1,43 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: main
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Needed for auth with Deno Deploy
+      contents: read # Needed to clone the repository
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v3
+
+      - name: Install Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - name: Get current deployment
+        id: deployment
+        run: |
+          echo "id=$(curl -s https://sam-discord-gpt.deno.dev/deployment-id | jq -r .deploymentId) " >> $GITHUB_OUTPUT
+
+      - name: Upload to Deno Deploy
+        uses: denoland/deployctl@v1
+        with:
+          project: sam-discord-gpt
+          entrypoint: "main.ts"
+          root: "."
+
+      - name: Remove former current deployment
+        continue-on-error: true
+        env:
+          DENO_DEPLOY_API_TOKEN: ${{ secrets.DENO_DEPLOY_API_TOKEN }}
+        run: |
+          deno install -Arf jsr:@deno/deployctl
+          deployctl api --token=${{ env.DENO_DEPLOY_API_TOKEN }} --method=DELETE deployments/${{ steps.deployment.outputs.id }}
