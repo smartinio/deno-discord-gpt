@@ -36,10 +36,7 @@ const isDev = Deno.env.get("LOCAL_DEV") === "true";
 
 type Provider = "openai" | "anthropic";
 
-const setProvider = async (
-  channelId: bigint,
-  provider: Provider,
-) => {
+const setProvider = async (channelId: bigint, provider: Provider) => {
   return await redis.set("provider:" + channelId, provider);
 };
 
@@ -47,7 +44,7 @@ const getProvider = async (channelId: bigint): Promise<Provider> => {
   return await redis.get("provider:" + channelId) || "openai" as Provider;
 };
 
-const deployment = new Date().toISOString();
+export const deployment = new Date().toISOString();
 
 const bot = createBot({
   token: DISCORD_TOKEN,
