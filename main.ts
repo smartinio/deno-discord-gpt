@@ -91,35 +91,36 @@ const bot = createBot({
 
       bot.helpers.startTyping(channelId);
 
-      const respond = async (
+      const respond = (
         response: string | { answer: string; imageUrl?: string },
         { finished = true }: { finished?: boolean } = {},
-      ) => {
-        log.info("Sending response", { response });
+      ) =>
+        retry(async () => {
+          log.info("Sending response", { response });
 
-        const embeds = typeof response !== "string" && response.imageUrl
-          ? [{ image: { url: response.imageUrl } }]
-          : undefined;
+          const embeds = typeof response !== "string" && response.imageUrl
+            ? [{ image: { url: response.imageUrl } }]
+            : undefined;
 
-        const answer = typeof response === "string"
-          ? response
-          : response.answer;
+          const answer = typeof response === "string"
+            ? response
+            : response.answer;
 
-        try {
-          await retry(() =>
-            bot.helpers.sendMessage(channelId, {
-              embeds,
-              content: `<@${authorId}> ${answer}`,
-            })
-          );
-        } catch (error: unknown) {
-          log.error("Failed sending response to Discord", {
-            errorMessage: (error as Error).message,
-          });
-        }
+          try {
+            await retry(() =>
+              bot.helpers.sendMessage(channelId, {
+                embeds,
+                content: `<@${authorId}> ${answer}`,
+              })
+            );
+          } catch (error: unknown) {
+            log.error("Failed sending response to Discord", {
+              errorMessage: (error as Error).message,
+            });
+          }
 
-        if (finished) shutdown.allow();
-      };
+          if (finished) shutdown.allow();
+        });
 
       if (!member?.roles?.some((role) => AI_CURIOUS_ROLE_IDS.includes(role))) {
         return respond(
