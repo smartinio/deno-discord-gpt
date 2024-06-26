@@ -13,6 +13,7 @@ import { createLog } from "./logger.ts";
 import { shutdown } from "./shutdown.ts";
 import { retry } from "./retry.ts";
 import { ContentType, supportedContentTypes } from "./ai.ts";
+import { chunkString } from "./strings.ts";
 
 // todo: Don't hardcode these role ids
 const AI_CURIOUS_ROLE_IDS = [1098370802526724206n, 1123952489562132540n];
@@ -45,6 +46,8 @@ const getProvider = async (channelId: bigint): Promise<Provider> => {
 };
 
 export const deployment = new Date().toISOString();
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const bot = createBot({
   token: DISCORD_TOKEN,
@@ -91,36 +94,61 @@ const bot = createBot({
 
       bot.helpers.startTyping(channelId);
 
-      const respond = (
+      const respond = async (
         response: string | { answer: string; imageUrl?: string },
         { finished = true }: { finished?: boolean } = {},
-      ) =>
-        retry(async () => {
-          log.info("Sending response", { response });
+      ) => {
+        log.info("Sending response", { response });
 
-          const embeds = typeof response !== "string" && response.imageUrl
-            ? [{ image: { url: response.imageUrl } }]
-            : undefined;
+        const embeds = typeof response !== "string" && response.imageUrl
+          ? [{ image: { url: response.imageUrl } }]
+          : undefined;
 
-          const answer = typeof response === "string"
-            ? response
-            : response.answer;
+        const answer = typeof response === "string"
+          ? response
+          : response.answer;
 
-          try {
+        const prefix = `<@${authorId}> `;
+        const ticks = "```";
+        const ln = "\n";
+
+        const chunks = chunkString(
+          answer,
+          2000 - prefix.length - 2 * (ticks.length + ln.length),
+        );
+
+        try {
+          for (let i = 0; i < chunks.length; i++) {
+            let chunk = chunks[i];
+
+            if (i === 0) {
+              chunk = prefix + chunk;
+            }
+
+            const tickCount = chunk.match(/```/g)?.length || 0;
+
+            if (tickCount % 2 === 1) {
+              chunk += ln + ticks;
+              if (chunks[i + 1]) chunks[i + 1] = ticks + ln + chunks[i + 1];
+            }
+
             await retry(() =>
               bot.helpers.sendMessage(channelId, {
                 embeds,
-                content: `<@${authorId}> ${answer}`,
+                content: chunk,
               })
             );
-          } catch (error: unknown) {
-            log.error("Failed sending response to Discord", {
-              errorMessage: (error as Error).message,
-            });
-          }
 
-          if (finished) shutdown.allow();
-        });
+            await sleep(500);
+          }
+        } catch (error: unknown) {
+          log.error("Failed sending response to Discord", {
+            errorMessage: (error as Error).message,
+          });
+        }
+
+        if (finished) shutdown.allow();
+      };
 
       if (!member?.roles?.some((role) => AI_CURIOUS_ROLE_IDS.includes(role))) {
         return respond(
