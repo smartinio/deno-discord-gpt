@@ -15,25 +15,6 @@ const VERSION = "anthropic.v1.3";
 const initialMessage =
   "Most importantly, in the following conversation, Claude is a word-efficient assistant in a Discord channel. Claude answers as concisely as possible, but subtly matches the tone and language of the person talking to it. Claude avoids bullet points and numbered lists, and prefers to use short, simple sentences. When bullet points or numbered lists are necessary, Claude will avoid line breaks between items to conserve vertical space. Claude skips emojis and excessive slang. Claude does not fall into the 'hello fellow kids' trap. Claude never tries to be on a moral high ground. Claude never censors profanity. Claude never tells the person it's talking to to be open minded or similar if they happen to be stereotypical or prejudicing. It's OK for this conversation. Claude remembers to always keep answers short. Claude avoids being verbose.";
 
-const imageGen = {
-  name: "generate_image",
-  description: "Generate an image with DALL-E 3",
-  input_schema: {
-    type: "object",
-    properties: {
-      prompt: {
-        type: "string",
-      },
-      style: {
-        type: "string",
-        enum: ["vivid", "natural"],
-      },
-    },
-    required: ["prompt"],
-    additionalProperties: false,
-  },
-} as const satisfies Anthropic.Tool;
-
 const resolveImage = async (url: string) => {
   const response = await fetch(url);
   const arrayBuffer = await response.arrayBuffer();
@@ -44,9 +25,8 @@ const resolveImage = async (url: string) => {
   const chunkSize = 0x8000; // Arbitrary chunk size to avoid call stack issues
 
   for (let i = 0; i < uint8Array.length; i += chunkSize) {
-    binaryString += String.fromCharCode.apply(
-      null,
-      [...uint8Array.subarray(i, i + chunkSize)],
+    binaryString += String.fromCharCode(
+      ...uint8Array.subarray(i, i + chunkSize),
     );
   }
 
@@ -56,8 +36,6 @@ const resolveImage = async (url: string) => {
 export const ask = async (
   {
     channelId,
-    log,
-    notify,
     question,
     images = [],
   }: AskAI,
@@ -68,7 +46,7 @@ export const ask = async (
   }
 
   if (question.toLowerCase() === "version") {
-    return String(VERSION);
+    return VERSION;
   }
 
   const history = await getHistory(channelId);
@@ -100,21 +78,19 @@ export const ask = async (
     max_tokens: 4000,
     temperature: 0,
     messages,
-    tools: [imageGen],
   });
 
-  const textBlocks = response.content.filter((m): m is Anthropic.TextBlock =>
+  const textResponses = response.content.filter((m): m is Anthropic.TextBlock =>
     m.type === "text"
-  );
+  ).map((m) => ({
+    role: "assistant" as const,
+    content: m.text,
+  }));
 
-  await remember(
-    channelId,
-    ...messages,
-    ...textBlocks.map((m) => ({
-      role: "assistant" as const,
-      content: m.text,
-    })),
-  );
+  const messagesToRemember = [...messages, ...textResponses].slice(-100);
+
+  await reset(channelId);
+  await remember(channelId, ...messagesToRemember);
 
   const blocks = response.content.flatMap((message) => {
     switch (message.type) {
@@ -122,12 +98,8 @@ export const ask = async (
         return message.text;
       case "tool_use":
         switch (message.name) {
-          case imageGen.name:
-            notify("Image generation is currently disabled. Sorry!");
-            return [];
           default:
-            notify(`Tool ${message.name} not defined`);
-            return [];
+            return `Tool "${message.name}" not defined`;
         }
     }
   });
