@@ -87,7 +87,7 @@ export const ask = async (
     content: m.text,
   }));
 
-  const messagesToRemember = [...messages, ...textResponses].slice(-100);
+  const messagesToRemember = [...messages, ...textResponses].slice(-25);
 
   await reset(channelId);
   await remember(channelId, ...messagesToRemember);
