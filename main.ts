@@ -139,7 +139,9 @@ const bot = createBot({
               })
             );
 
-            await sleep(500);
+            if (i < chunks.length - 1) {
+              await sleep(500);
+            }
           }
         } catch (error: unknown) {
           log.error("Failed sending response to Discord", {
