@@ -1,4 +1,4 @@
-import Anthropic from "https://esm.sh/@anthropic-ai/sdk@0.24.0";
+import Anthropic from "https://esm.sh/@anthropic-ai/sdk@0.24.3";
 
 import { type AskAI, createCache } from "./ai.ts";
 
@@ -88,6 +88,10 @@ export const ask = async (
   }));
 
   const messagesToRemember = [...messages, ...textResponses].slice(-25);
+
+  while (messagesToRemember[0].role !== "user") {
+    messagesToRemember.shift();
+  }
 
   await reset(channelId);
   await remember(channelId, ...messagesToRemember);

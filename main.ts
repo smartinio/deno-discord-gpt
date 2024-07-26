@@ -132,16 +132,16 @@ const bot = createBot({
               if (chunks[i + 1]) chunks[i + 1] = ticks + ln + chunks[i + 1];
             }
 
+            if (i > 0) {
+              await sleep(500);
+            }
+
             await retry(() =>
               bot.helpers.sendMessage(channelId, {
                 embeds,
                 content: chunk,
               })
             );
-
-            if (i < chunks.length - 1) {
-              await sleep(500);
-            }
           }
         } catch (error: unknown) {
           log.error("Failed sending response to Discord", {
