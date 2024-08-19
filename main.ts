@@ -192,7 +192,7 @@ const bot = createBot({
         return respond(deployment);
       }
 
-      if (question.startsWith("!provider ")) {
+      if (/^provider \w+$/.test(question)) {
         const provider = ((): Provider | undefined => {
           if (msg.content.includes("openai")) return "openai";
           if (msg.content.includes("anthropic")) return "anthropic";
