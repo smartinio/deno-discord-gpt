@@ -15,7 +15,7 @@ import { shutdown } from "./shutdown.ts";
 import { retry } from "./retry.ts";
 import { ContentType, supportedContentTypes } from "./ai.ts";
 import { chunkString } from "./strings.ts";
-import { fetchImageBlob, resolveImage } from "./images.ts";
+import { fetchImageBlob } from "./images.ts";
 
 // todo: Don't hardcode these role ids
 const AI_CURIOUS_ROLE_IDS = [1098370802526724206n, 1123952489562132540n];
