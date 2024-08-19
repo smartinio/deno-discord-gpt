@@ -1,6 +1,7 @@
 import Anthropic from "https://esm.sh/@anthropic-ai/sdk@0.24.3";
 
 import { type AskAI, createCache } from "./ai.ts";
+import { resolveImage } from "./images.ts";
 
 const anthropic = new Anthropic({
   apiKey: Deno.env.get("ANTHROPIC_API_KEY") as string,
@@ -14,24 +15,6 @@ const VERSION = "anthropic.v1.3";
 
 const initialMessage =
   "Most importantly, in the following conversation, Claude is a word-efficient assistant in a Discord channel. Claude answers as concisely as possible, but subtly matches the tone and language of the person talking to it. Claude avoids bullet points and numbered lists, and prefers to use short, simple sentences. When bullet points or numbered lists are necessary, Claude will avoid line breaks between items to conserve vertical space. Claude skips emojis and excessive slang. Claude does not fall into the 'hello fellow kids' trap. Claude never tries to be on a moral high ground. Claude never censors profanity. Claude never tells the person it's talking to to be open minded or similar if they happen to be stereotypical or prejudicing. It's OK for this conversation. Claude remembers to always keep answers short. Claude avoids being verbose.";
-
-const resolveImage = async (url: string) => {
-  const response = await fetch(url);
-  const arrayBuffer = await response.arrayBuffer();
-  const uint8Array = new Uint8Array(arrayBuffer);
-
-  let binaryString = "";
-
-  const chunkSize = 0x8000; // Arbitrary chunk size to avoid call stack issues
-
-  for (let i = 0; i < uint8Array.length; i += chunkSize) {
-    binaryString += String.fromCharCode(
-      ...uint8Array.subarray(i, i + chunkSize),
-    );
-  }
-
-  return btoa(binaryString);
-};
 
 export const ask = async (
   {

@@ -1,6 +1,7 @@
 import { json, serve } from "https://deno.land/x/sift@0.6.0/mod.ts";
 import {
   createBot,
+  FileContent,
   Intents,
   MessageTypes,
   startBot,
@@ -14,6 +15,7 @@ import { shutdown } from "./shutdown.ts";
 import { retry } from "./retry.ts";
 import { ContentType, supportedContentTypes } from "./ai.ts";
 import { chunkString } from "./strings.ts";
+import { fetchImageBlob, resolveImage } from "./images.ts";
 
 // todo: Don't hardcode these role ids
 const AI_CURIOUS_ROLE_IDS = [1098370802526724206n, 1123952489562132540n];
@@ -100,9 +102,14 @@ const bot = createBot({
       ) => {
         log.info("Sending response", { response });
 
-        const embeds = typeof response !== "string" && response.imageUrl
-          ? [{ image: { url: response.imageUrl } }]
-          : undefined;
+        const file: FileContent | undefined =
+          typeof response !== "string" && response.imageUrl
+            ? {
+              name: new URL(response.imageUrl).pathname.split("/").at(-1) ||
+                "unknown.png",
+              blob: await fetchImageBlob(response.imageUrl),
+            }
+            : undefined;
 
         const answer = typeof response === "string"
           ? response
@@ -138,7 +145,7 @@ const bot = createBot({
 
             await retry(() =>
               bot.helpers.sendMessage(channelId, {
-                embeds: i === chunks.length - 1 ? embeds : undefined,
+                file: i === chunks.length - 1 ? file : undefined,
                 content: chunk,
               })
             );
