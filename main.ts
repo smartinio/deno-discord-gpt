@@ -138,7 +138,7 @@ const bot = createBot({
 
             await retry(() =>
               bot.helpers.sendMessage(channelId, {
-                embeds,
+                embeds: i === chunks.length - 1 ? embeds : undefined,
                 content: chunk,
               })
             );

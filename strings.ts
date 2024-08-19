@@ -37,5 +37,9 @@ export const chunkString = (str: string, maxChunkSize = 2000) => {
     start = end + 1;
   }
 
+  if (chunks.length === 0) {
+    chunks.push(str);
+  }
+
   return chunks;
 };
