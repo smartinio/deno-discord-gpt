@@ -32,6 +32,14 @@ const shutdownHandler = async (type: string) => {
   Deno.exit(0);
 };
 
+globalThis.addEventListener("unhandledrejection", (e) => {
+  console.error(e);
+});
+
+globalThis.addEventListener("error", (e) => {
+  console.error(e);
+});
+
 gracefulShutdown(shutdownHandler);
 
 deploymentChannel.onmessage = (e) => {
