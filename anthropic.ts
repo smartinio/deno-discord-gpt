@@ -1,4 +1,4 @@
-import Anthropic from "https://esm.sh/@anthropic-ai/sdk@0.24.3";
+import Anthropic from "https://esm.sh/@anthropic-ai/sdk@0.36.3";
 
 import { type AskAI, createCache } from "./ai.ts";
 import { resolveImage } from "./images.ts";
@@ -57,7 +57,7 @@ export const ask = async (
 
   const response = await anthropic.messages.create({
     system: initialMessage,
-    model: "claude-3-5-sonnet-20240620",
+    model: "claude-3-5-sonnet-latest",
     max_tokens: 4000,
     temperature: 0,
     messages,
