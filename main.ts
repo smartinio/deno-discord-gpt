@@ -1,11 +1,12 @@
 import { json, serve } from "https://deno.land/x/sift@0.6.0/mod.ts";
 import {
+  ChannelTypes,
   createBot,
   FileContent,
   Intents,
   MessageTypes,
   startBot,
-} from "https://deno.land/x/discordeno@13.0.0/mod.ts";
+} from "https://deno.land/x/discordeno@18.0.0/mod.ts";
 
 import * as anthropic from "./anthropic.ts";
 import * as openai from "./openai.ts";
@@ -37,14 +38,22 @@ const continueTyping = (channelId: bigint) => {
 
 const isDev = Deno.env.get("LOCAL_DEV") === "true";
 
-type Provider = "openai" | "anthropic";
+const providerModels = [
+  "openai:gpt-4o",
+  "openai:o3-mini",
+  "anthropic:claude-3-5-sonnet-latest",
+] as const;
+
+type Provider = typeof providerModels[number];
 
 const setProvider = async (channelId: bigint, provider: Provider) => {
   return await redis.set("provider:" + channelId, provider);
 };
 
-const getProvider = async (channelId: bigint): Promise<Provider> => {
-  return await redis.get("provider:" + channelId) || "openai" as Provider;
+const getProviderModel = async (
+  channelId: bigint,
+): Promise<Provider | null> => {
+  return await redis.get("provider:" + channelId);
 };
 
 export const deployment = new Date().toISOString();
@@ -67,8 +76,21 @@ const bot = createBot({
 
       if (authorId === DISCORD_CLIENT_ID) return;
       if (type === MessageTypes.Reply) return;
-      if (!isDev && !mentionedUserIds.includes(DISCORD_CLIENT_ID)) return;
-      if (isDev && !msg.content.startsWith("!dev ")) return;
+
+      const chan = await bot.helpers.getChannel(channelId);
+
+      const isAiResponseThread = chan.type === ChannelTypes.PublicThread ||
+        chan.type === ChannelTypes.PrivateThread &&
+          chan.ownerId === DISCORD_CLIENT_ID;
+
+      if (
+        !isDev && !mentionedUserIds.includes(DISCORD_CLIENT_ID) &&
+        !isAiResponseThread
+      ) return;
+
+      if (isDev && !msg.content.startsWith("!dev ") && !isAiResponseThread) {
+        return;
+      }
 
       if (isDev) {
         msg.content = msg.content.replace(/^!dev /, "");
@@ -96,6 +118,34 @@ const bot = createBot({
 
       bot.helpers.startTyping(channelId);
 
+      const question = content.replace(INITIAL_MENTION, "").trim();
+
+      let threadId;
+
+      if (
+        chan.type === ChannelTypes.PublicThread ||
+        chan.type === ChannelTypes.PrivateThread
+      ) {
+        threadId = chan.id;
+      } else {
+        let threadName = `❓ ${question}`.slice(0, 100);
+
+        if (threadName.length === 100) {
+          threadName = threadName.slice(0, threadName.length - 1) + "…";
+        }
+
+        const thread = await bot.helpers.startThreadWithMessage(
+          channelId,
+          id,
+          {
+            name: threadName,
+            autoArchiveDuration: 60,
+          },
+        );
+
+        threadId = thread.id;
+      }
+
       const respond = async (
         response: string | { answer: string; imageUrl?: string },
         { finished = true }: { finished?: boolean } = {},
@@ -115,7 +165,7 @@ const bot = createBot({
           ? response
           : response.answer;
 
-        const prefix = `<@${authorId}> `;
+        const prefix = ``;
         const ticks = "```";
         const ln = "\n";
 
@@ -144,7 +194,7 @@ const bot = createBot({
             }
 
             await retry(() =>
-              bot.helpers.sendMessage(channelId, {
+              bot.helpers.sendMessage(threadId, {
                 file: i === chunks.length - 1 ? file : undefined,
                 content: chunk,
               })
@@ -177,7 +227,7 @@ const bot = createBot({
         );
       }
 
-      if (!isDev && !INITIAL_MENTION.test(content)) {
+      if (!isDev && !INITIAL_MENTION.test(content) && !isAiResponseThread) {
         return respond(
           `Please @ me before your question like this: <@${DISCORD_CLIENT_ID}> what is the meaning of life?`,
         );
@@ -193,20 +243,20 @@ const bot = createBot({
         );
       }
 
-      const question = content.replace(INITIAL_MENTION, "").trim();
-
       if (question === "deployment") {
         return respond(deployment);
       }
 
-      if (/^provider \w+$/.test(question)) {
-        const provider = ((): Provider | undefined => {
-          if (msg.content.includes("openai")) return "openai";
-          if (msg.content.includes("anthropic")) return "anthropic";
-        })();
+      if (/^provider .+$/.test(question)) {
+        const provider = providerModels.find((providerModel) =>
+          msg.content.includes(providerModel)
+        );
 
         if (!provider) {
-          return respond("Please specify a valid provider (openai, anthropic)");
+          return respond(
+            "Please specify a valid provider: " +
+              providerModels.map((p) => `\`${p}\``).join(", "),
+          );
         }
 
         const didSet = await setProvider(channelId, provider);
@@ -235,29 +285,43 @@ const bot = createBot({
         );
       }
 
-      const provider = await getProvider(channelId);
+      const providerModel = (await getProviderModel(channelId)) ||
+        chan.parentId &&
+          (await getProviderModel(chan.parentId)) ||
+        "openai:gpt-4o";
+
+      const [provider, model] = providerModel.split(":");
 
       const ai = ({
         openai,
         anthropic,
       })[provider];
 
+      if (!ai) {
+        return respond("Invalid provider model configured " + providerModel);
+      }
+
+      if (question === "provider") {
+        return respond(providerModel);
+      }
+
       const stopTyping = continueTyping(channelId);
 
       try {
         const answer = await ai.ask({
           question,
-          channelId,
+          channelId: threadId,
           log,
           images,
           notify: (m) => respond(m, { finished: false }),
+          model,
         });
 
         return await respond(answer);
       } catch (error: unknown) {
-        log.error("Error", { errorMessage: (error as Error).message });
-
         try {
+          console.error(error);
+          log.error("Error", { errorMessage: (error as Error).message });
           // @ts-ignore: logging raw errors may not be supported
           log.error(error);
         } catch {

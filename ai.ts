@@ -16,6 +16,7 @@ export type AskAI = {
   log: Log;
   images?: { url: string; contentType: ContentType }[];
   notify: (message: string) => void;
+  model?: string;
 };
 
 export const createCache = <T>(namespace: string) => {

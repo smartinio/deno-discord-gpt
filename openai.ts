@@ -1,4 +1,4 @@
-import { OpenAI } from "https://deno.land/x/openai@v4.28.4/mod.ts";
+import { OpenAI } from "https://deno.land/x/openai@v4.69.0/mod.ts";
 
 import { lock } from "./redis.ts";
 
@@ -66,6 +66,7 @@ export const ask = async ({
   log,
   images,
   notify,
+  model,
 }: AskAI): Promise<string | { answer: string; imageUrl?: string }> => {
   return await lock(channelId, async () => {
     if (question.toLowerCase() === "reset") {
@@ -129,7 +130,7 @@ export const ask = async ({
     });
 
     const answer = await openAI.chat.completions.create({
-      model: "gpt-4o",
+      model: model || "gpt-4o",
       messages,
       tools: [openai_images_generate],
     });
@@ -178,6 +179,7 @@ export const ask = async ({
       log.info("Reset due to usage", { ...answer.usage });
       await reset(channelId);
     } else if (!imagesResponse) {
+      // @ts-ignore - fixme, function_call is nullable
       await remember(channelId, ...newMessages, reply.message);
     }
 
