@@ -77,6 +77,23 @@ const bot = createBot({
       if (authorId === DISCORD_CLIENT_ID) return;
       if (type === MessageTypes.Reply) return;
 
+      const connectIp = /connect (\d+\.\d+\.\d+\.\d+:\d+)$/;
+
+      if (connectIp.test(msg.content)) {
+        const taskStatus = await acquireTask(String(msg.id));
+
+        if (taskStatus !== "OK") {
+          if (shutdown.imminent) shutdown.allow();
+          return;
+        }
+
+        const ip = connectIp.exec(msg.content)?.[1];
+
+        return await bot.helpers.sendMessage(msg.channelId, {
+          content: `https://sam-discord-gpt.deno.dev/steam/connect/${ip}`,
+        });
+      }
+
       const chan = await bot.helpers.getChannel(channelId);
 
       const isAiResponseThread = chan.type === ChannelTypes.PublicThread ||
@@ -339,6 +356,18 @@ const bot = createBot({
 await startBot(bot);
 
 serve({
+  "/steam/connect/:ip": (_req, _info, params) => {
+    if (!params?.ip?.match(/^\d+\.\d+\.\d+\.\d+:\d+$/)) {
+      return new Response(null, { status: 400 });
+    }
+
+    return new Response(null, {
+      status: 302,
+      headers: {
+        location: `steam://connect/${params.ip}`,
+      },
+    });
+  },
   "/deployment-id": () => {
     return json({ deploymentId: Deno.env.get("DENO_DEPLOYMENT_ID") as string });
   },
