@@ -2,9 +2,12 @@ import { OpenAI } from "https://deno.land/x/openai@v4.69.0/mod.ts";
 
 import { lock } from "./redis.ts";
 
+import { resolveImage } from "./images.ts";
+
 import { type AskAI, createCache } from "./ai.ts";
 
 import type {
+  ChatCompletionContentPart,
   ChatCompletionCreateParams,
   ChatCompletionTool,
   ImagesResponse,
@@ -109,13 +112,15 @@ export const ask = async ({
 
     const content: Message["content"] = [{ type: "text", text: question }];
 
-    const imageUrls = images?.map(({ url }) => url);
+    const imageUrls = images?.map(({ url }) => url) || [];
 
-    if (imageUrls?.length) {
-      const images = imageUrls.map((url) => ({
+    const resolvedImages = await Promise.all(imageUrls.map(resolveImage));
+
+    if (resolvedImages?.length) {
+      const images = resolvedImages.map((image): ChatCompletionContentPart => ({
         type: "image_url",
-        image_url: { url, detail: "low" },
-      } as const));
+        image_url: { url: "data:image/jpeg;base64," + image, detail: "low" },
+      }));
 
       content.push(...images);
     }
