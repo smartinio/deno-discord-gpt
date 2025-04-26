@@ -1,3 +1,5 @@
+import { redis } from "./redis.ts";
+
 export const fetchImageBlob = async (url: string) => {
   const response = await fetch(url);
   const arrayBuffer = await response.arrayBuffer();
@@ -23,4 +25,20 @@ export const resolveImage = async (url: string) => {
   }
 
   return btoa(binaryString);
+};
+
+const baseUrl = Deno.env.get("BASE_URL") || "http://localhost:8000";
+
+export const saveGeneratedImage = async (b64: string) => {
+  const id = crypto.randomUUID() + ".jpeg";
+
+  await redis.set(`generated-image:${id}`, b64, {
+    ex: 60 * 60 * 24, /* 1 day */
+  });
+
+  return `${baseUrl}/generated-image/${id}`;
+};
+
+export const fetchGeneratedImage = async (id: string) => {
+  return await redis.get<string>(`generated-image:${id}`);
 };

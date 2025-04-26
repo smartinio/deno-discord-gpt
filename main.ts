@@ -9,14 +9,14 @@ import {
 } from "https://deno.land/x/discordeno@18.0.0/mod.ts";
 
 import * as anthropic from "./anthropic.ts";
-import * as openai from "./openai.ts";
+import * as openai from "./openaiv2.ts";
 import { redis } from "./redis.ts";
 import { createLog } from "./logger.ts";
 import { shutdown } from "./shutdown.ts";
 import { retry } from "./retry.ts";
 import { ContentType, supportedContentTypes } from "./ai.ts";
 import { chunkString } from "./strings.ts";
-import { fetchImageBlob } from "./images.ts";
+import { fetchGeneratedImage, fetchImageBlob } from "./images.ts";
 
 // todo: Don't hardcode these role ids
 const AI_CURIOUS_ROLE_IDS = [1098370802526724206n, 1123952489562132540n];
@@ -39,8 +39,7 @@ const continueTyping = (channelId: bigint) => {
 const isDev = Deno.env.get("LOCAL_DEV") === "true";
 
 const providerModels = [
-  "openai:gpt-4o",
-  "openai:o3-mini",
+  "openai:o3",
   "anthropic:claude-3-5-sonnet-latest",
 ] as const;
 
@@ -59,6 +58,8 @@ const getProviderModel = async (
 export const deployment = new Date().toISOString();
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const baseUrl = Deno.env.get("BASE_URL") || "http://localhost:8000";
 
 const bot = createBot({
   token: DISCORD_TOKEN,
@@ -90,7 +91,7 @@ const bot = createBot({
         const ip = connectIp.exec(msg.content)?.[1];
 
         return await bot.helpers.sendMessage(msg.channelId, {
-          content: `https://sam-discord-gpt.deno.dev/steam/connect/${ip}`,
+          content: `${baseUrl}/steam/connect/${ip}`,
         });
       }
 
@@ -356,6 +357,25 @@ const bot = createBot({
 await startBot(bot);
 
 serve({
+  "/generated-image/:id": async (_req, _info, params) => {
+    if (!params?.id) {
+      return new Response(null, { status: 404 });
+    }
+
+    const imageBase64 = await fetchGeneratedImage(params.id);
+
+    if (!imageBase64) {
+      return new Response(null, { status: 404 });
+    }
+
+    const bytes = Uint8Array.from(atob(imageBase64), (c) => c.charCodeAt(0));
+
+    return new Response(bytes, {
+      headers: {
+        "Content-Type": "image/jpeg",
+      },
+    });
+  },
   "/steam/connect/:ip": (_req, _info, params) => {
     if (!params?.ip?.match(/^\d+\.\d+\.\d+\.\d+:\d+$/)) {
       return new Response(null, { status: 400 });

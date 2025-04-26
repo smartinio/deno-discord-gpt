@@ -2,5 +2,8 @@
   "tasks": {
     "lint": "deno lint --ignore=env.ts",
     "ts": "deno check *.ts"
+  },
+  "imports": {
+    "@openai/openai": "jsr:@openai/openai@^4.96.0"
   }
 }
