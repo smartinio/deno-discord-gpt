@@ -180,6 +180,10 @@ const bot = createBot({
             }
             : undefined;
 
+        if (file && typeof response !== "string" && response.imageUrl) {
+          log.info("File attachment", { name: file.name, url: response.imageUrl })
+        }
+
         const answer = typeof response === "string"
           ? response
           : response.answer;
