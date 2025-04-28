@@ -144,7 +144,7 @@ const editImage = async ({
 
   const { prompt } = args;
 
-  log.info("Editing image", { prompt });
+  log.info("Editing image", { prompt, url });
 
   notify("Editing image. Might take a while...");
 
