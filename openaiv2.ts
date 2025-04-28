@@ -321,6 +321,9 @@ export const ask = async ({
 
     await setLastResponseId(channelId, finalResponse.id);
 
+    // warm up the imageUrl because webdev has gone to shit
+    await fetch(imageUrl);
+
     return {
       answer: finalResponse.output_text,
       imageUrl,
