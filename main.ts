@@ -365,7 +365,7 @@ serve({
 
     if (!imageBase64) return new Response(null, { status: 404 });
 
-    const bytes = base64Decode(imageBase64);
+    const bytes = decodeBase64(imageBase64);
 
     return new Response(bytes, {
       headers: { "Content-Type": "image/jpeg" },
