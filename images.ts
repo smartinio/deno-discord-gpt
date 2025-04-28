@@ -1,3 +1,4 @@
+import { fileTypeFromBuffer } from "https://esm.sh/file-type";
 import { redis } from "./redis.ts";
 
 export const fetchImageBlob = async (url: string) => {
@@ -29,27 +30,53 @@ export const resolveImage = async (url: string) => {
 
 export const resolveImageAsFile = async (url: string) => {
   const res = await fetch(url);
-  const buf  = await res.arrayBuffer();
+  const buf = await res.arrayBuffer();
 
   return new File(
     [buf],
     url.split("/").at(-1) ?? "image.jpeg",
-    { type: res.headers.get("content-type") ?? "image/jpeg" }
+    { type: res.headers.get("content-type") ?? "image/jpeg" },
   );
-}
+};
 
 const baseUrl = Deno.env.get("BASE_URL") || "http://localhost:8000";
 
 export const saveGeneratedImage = async (b64: string) => {
-  const id = crypto.randomUUID() + ".jpeg";
+  const mime = await detectImageMime(b64);
 
-  await redis.set(`generated-image:${id}`, b64, {
+  if (!mime || !mime.startsWith("image/")) {
+    throw new Error("Failed to detect mime type");
+  }
+
+  const id = crypto.randomUUID() + mime.replace("image/", ".");
+
+  await redis.set(`generated-image:${id}`, `data:${mime};base64,${b64}`, {
     ex: 60 * 60 * 12, /* 12h */
   });
 
-  return `${baseUrl}/generated-image/${id}`;
+  return { mime, url: `${baseUrl}/generated-image/${id}` };
 };
 
 export const fetchGeneratedImage = async (id: string) => {
-  return await redis.get<string>(`generated-image:${id}`);
+  const image = await redis.get<string>(`generated-image:${id}`);
+
+  if (!image) {
+    return null;
+  }
+
+  const mime = image.replace(/^data:([^;]+);.*$/, "$1");
+  const base64 = image.replace(/^.*base64,(.*)$/, "$1");
+
+  return { mime, base64 };
+};
+
+const base64ToBytes = (b64: string) => {
+  const binary = atob(b64);
+  return Uint8Array.from(binary, (c) => c.charCodeAt(0));
+};
+
+export const detectImageMime = async (base64Payload: string) => {
+  const bytes = base64ToBytes(base64Payload);
+  const result = await fileTypeFromBuffer(bytes);
+  return result?.mime;
 };

@@ -11,6 +11,7 @@ import { lock, redis } from "./redis.ts";
 import { OpenAI } from "@openai/openai";
 import { Log } from "./logger.ts";
 import { resolveImageAsFile, saveGeneratedImage } from "./images.ts";
+import { decodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") as string;
 
@@ -224,9 +225,13 @@ export const ask = async ({
       item.type === "function_call"
     );
 
-    log.info("response output", { output: response.output })
+    log.info("response output", { output: response.output });
 
-    let imageUrl: string | undefined;
+    let image: {
+      mime: string;
+      url: string;
+      blob: Blob;
+    } | undefined;
 
     const handleImageResponse = async (
       imageResponse: { error: string } | { result: ImagesResponse },
@@ -249,8 +254,15 @@ export const ask = async ({
         };
       }
 
-      imageUrl = await saveGeneratedImage(b64);
-      await setLastImageUrl(channelId, imageUrl);
+      const { mime, url } = await saveGeneratedImage(b64);
+
+      image = {
+        mime,
+        url,
+        blob: new Blob([decodeBase64(b64)], { type: mime }),
+      };
+
+      await setLastImageUrl(channelId, image.url);
     };
 
     if (functionCall) {
@@ -299,7 +311,7 @@ export const ask = async ({
 
     await setLastResponseId(channelId, response.id);
 
-    if (!imageUrl || !functionCall) {
+    if (!image || !functionCall) {
       return { answer: response.output_text };
     }
 
@@ -323,12 +335,9 @@ export const ask = async ({
 
     await setLastResponseId(channelId, finalResponse.id);
 
-    // warm up the imageUrl because webdev has gone to shit
-    await fetch(imageUrl);
-
     return {
       answer: finalResponse.output_text,
-      imageUrl,
+      image,
     };
   });
 };
