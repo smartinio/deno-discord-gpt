@@ -222,6 +222,8 @@ export const ask = async ({
       item.type === "function_call"
     );
 
+    log.info("response output", { output: response.output })
+
     let imageUrl: string | undefined;
 
     const handleImageResponse = async (
