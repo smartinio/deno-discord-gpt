@@ -308,7 +308,7 @@ export const ask = async ({
         {
           type: "function_call_output",
           call_id: functionCall.call_id,
-          output: { image_url: imageUrl },
+          output: JSON.stringify({ image_url: imageUrl }),
         },
       ],
       store: true,
