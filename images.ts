@@ -27,7 +27,7 @@ export const resolveImage = async (url: string) => {
   return btoa(binaryString);
 };
 
-export const resolveImageAsFile = (url: string) => {
+export const resolveImageAsFile = async (url: string) => {
   const res = await fetch(url);
   const buf  = await res.arrayBuffer();
 
