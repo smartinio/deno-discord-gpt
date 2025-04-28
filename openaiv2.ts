@@ -301,16 +301,10 @@ export const ask = async ({
       return { answer: response.output_text };
     }
 
-    // openai API is bugged so this is needed to pass validation
-    // @see https://community.openai.com/t/how-to-solve-badrequesterror-400-item-rs-of-type-reasoning-was-provided-without-its-required-following-item-error-in-responses-api/1151686/5
-    if (!('reasoning' in functionCall)) {
-      functionCall.reasoning = "n/a";
-    }
-
     const finalResponse = await openAI.responses.create({
       model: "o3",
       input: [
-        functionCall,
+        ...response.output,
         {
           type: "function_call_output",
           call_id: functionCall.call_id,
