@@ -46,13 +46,15 @@ jobs:
         id: health
         run: |
           attempt=0
-          while [ $attempt -lt 30 ]; do
-            if curl -s https://sam-discord-gpt.deno.dev/ready | jq -r .ready == "true"; then
+          while [ "$attempt" -lt 30 ]; do
+            if [ "$(curl -s https://sam-discord-gpt.deno.dev/ready | jq -r .ready)" = "true" ]; then
               echo "Deployment ready"
               exit 0
             fi
+
             attempt=$((attempt + 1))
             sleep 1
           done
+
           echo "Deployment not ready after 30 attempts"
           exit 1
