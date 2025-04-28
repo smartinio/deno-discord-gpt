@@ -304,11 +304,11 @@ export const ask = async ({
     const finalResponse = await openAI.responses.create({
       model: "o3",
       input: [
-        ...response.output,
+        // ...response.output,
         {
           type: "function_call_output",
           call_id: functionCall.call_id,
-          output: JSON.stringify({ image_url: imageUrl }),
+          output: { image_url: imageUrl },
         },
       ],
       store: true,
