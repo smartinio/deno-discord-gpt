@@ -1,4 +1,5 @@
 import { json, serve } from "https://deno.land/x/sift@0.6.0/mod.ts";
+import { decode as base64Decode } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 import {
   ChannelTypes,
   createBot,
@@ -357,25 +358,19 @@ const bot = createBot({
 await startBot(bot);
 
 serve({
-  "/generated-image/:id": async (_req, _info, params) => {
-    if (!params?.id) {
-      return new Response(null, { status: 404 });
-    }
+  "/generated-image/:id": async (_req, _info, { id }) => {
+    if (!id) return new Response(null, { status: 404 });
 
-    const imageBase64 = await fetchGeneratedImage(params.id);
+    const imageBase64 = await fetchGeneratedImage(id);
 
-    if (!imageBase64) {
-      return new Response(null, { status: 404 });
-    }
+    if (!imageBase64) return new Response(null, { status: 404 });
 
-    const bytes = Uint8Array.from(atob(imageBase64), (c) => c.charCodeAt(0));
+    const bytes = base64Decode(imageBase64);
 
     return new Response(bytes, {
-      headers: {
-        "Content-Type": "image/jpeg",
-      },
+      headers: { "Content-Type": "image/jpeg" },
     });
-  },
+  };
   "/steam/connect/:ip": (_req, _info, params) => {
     if (!params?.ip?.match(/^\d+\.\d+\.\d+\.\d+:\d+$/)) {
       return new Response(null, { status: 400 });
