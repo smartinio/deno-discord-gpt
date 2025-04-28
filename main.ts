@@ -1,5 +1,5 @@
 import { json, serve } from "https://deno.land/x/sift@0.6.0/mod.ts";
-import { decode as base64Decode } from "https://deno.land/std@0.224.0/encoding/base64.ts";
+import { base64Decode } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 import {
   ChannelTypes,
   createBot,
