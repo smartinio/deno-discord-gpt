@@ -27,13 +27,12 @@ export const resolveImage = async (url: string) => {
   return btoa(binaryString);
 };
 
-export const resolveImageAsFile = async (url: string) => {
-  const imageBase64 = await resolveImage(url);
+export const resolveImageAsFile = (url: string) => {
+  const res = await fetch(url);
+  const buf  = await res.arrayBuffer();
 
-  return new File([atob(imageBase64)], "image.jpeg", {
-    type: "image/jpeg",
-  });
-};
+  return new File([buf], "image.jpg", { type: "image/jpeg" });
+}
 
 const baseUrl = Deno.env.get("BASE_URL") || "http://localhost:8000";
 

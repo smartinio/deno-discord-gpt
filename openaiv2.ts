@@ -249,7 +249,9 @@ export const ask = async ({
       await setLastImageUrl(channelId, imageUrl);
     };
 
-    log.info("Function call", { functionCall });
+    if (functionCall) {
+      log.info("Function call", { functionCall });
+    }
 
     switch (functionCall?.name) {
       case "openai_images_generate": {
