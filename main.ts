@@ -1,13 +1,13 @@
 import { json, serve } from "https://deno.land/x/sift@0.6.0/mod.ts";
 import { decodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
+
 import {
   ChannelTypes,
   createBot,
-  FileContent,
+  CreateMessageOptions,
   Intents,
   MessageTypes,
-  startBot,
-} from "https://deno.land/x/discordeno@18.0.0/mod.ts";
+} from "npm:@discordeno/bot@21.0.0";
 
 import * as anthropic from "./anthropic.ts";
 import * as openai from "./openaiv2.ts";
@@ -33,7 +33,10 @@ const acquireTask = async (id: string) => {
 };
 
 const continueTyping = (channelId: bigint) => {
-  const interval = setInterval(() => bot.helpers.startTyping(channelId), 5000);
+  const interval = setInterval(
+    () => bot.helpers.triggerTypingIndicator(channelId),
+    5000,
+  );
   return () => clearInterval(interval);
 };
 
@@ -65,18 +68,47 @@ const baseUrl = Deno.env.get("BASE_URL") || "http://localhost:8000";
 const bot = createBot({
   token: DISCORD_TOKEN,
   intents: Intents.GuildMessages | Intents.MessageContent,
+  desiredProperties: {
+    user: {
+      id: true,
+    },
+    message: {
+      id: true,
+      attachments: true,
+      author: true,
+      content: true,
+      channelId: true,
+      member: true,
+      mentions: true,
+      type: true,
+    },
+    channel: {
+      id: true,
+      parentId: true,
+      type: true,
+      ownerId: true,
+    },
+    member: {
+      nick: true,
+      roles: true,
+    },
+    attachment: {
+      url: true,
+      contentType: true,
+    },
+  },
   events: {
-    async messageCreate(bot, msg) {
+    async messageCreate(msg): Promise<unknown> {
       const {
         id,
-        authorId,
+        author,
         channelId,
         member,
         mentionedUserIds,
         type,
       } = msg;
 
-      if (authorId === DISCORD_CLIENT_ID) return;
+      if (author.id === DISCORD_CLIENT_ID) return;
       if (type === MessageTypes.Reply) return;
 
       const connectIp = /connect (\d+\.\d+\.\d+\.\d+:\d+)$/;
@@ -135,7 +167,7 @@ const bot = createBot({
 
       log.info("Processing message", { content, att: msg.attachments });
 
-      bot.helpers.startTyping(channelId);
+      bot.helpers.triggerTypingIndicator(channelId);
 
       const question = content.replace(INITIAL_MENTION, "").trim();
 
@@ -171,18 +203,15 @@ const bot = createBot({
       ) => {
         log.info("Sending response", { response });
 
-        const file: FileContent | undefined =
-          typeof response !== "string" && response.imageUrl
+        const file:
+          | NonNullable<CreateMessageOptions["files"]>[number]
+          | undefined = typeof response !== "string" && response.imageUrl
             ? {
-              name: new URL(response.imageUrl).pathname.split("/").at(-1) ||
-                "unknown.png",
               blob: await fetchImageBlob(response.imageUrl),
+              name: new URL(response.imageUrl).pathname.split("/").at(-1) ||
+                "unknown",
             }
             : undefined;
-
-        if (file && typeof response !== "string" && response.imageUrl) {
-          log.info("File attachment", { name: file.name, url: response.imageUrl })
-        }
 
         const answer = typeof response === "string"
           ? response
@@ -218,12 +247,14 @@ const bot = createBot({
 
             await retry(() =>
               bot.helpers.sendMessage(threadId, {
-                file: i === chunks.length - 1 ? file : undefined,
+                files: i === chunks.length - 1 && file ? [file] : undefined,
                 content: chunk,
               })
             );
           }
         } catch (error: unknown) {
+          console.error(error);
+
           log.error("Failed sending response to Discord", {
             errorMessage: (error as Error).message,
           });
@@ -239,7 +270,7 @@ const bot = createBot({
       }
 
       if (
-        msg.attachments.some((attachment) =>
+        msg.attachments?.some((attachment) =>
           !supportedContentTypes.includes(
             attachment.contentType! as ContentType,
           )
@@ -293,7 +324,7 @@ const bot = createBot({
 
       log.info("Question", { question });
 
-      const images = msg.attachments.map(({ url, contentType }) => ({
+      const images = msg.attachments?.map(({ url, contentType }) => ({
         url,
         contentType: contentType as ContentType,
       }));
@@ -359,10 +390,10 @@ const bot = createBot({
   },
 });
 
-await startBot(bot);
+await bot.start();
 
 serve({
-  "/generated-image/:id": async (_req, _info, { id }) => {
+  "/generated-image/:id": async (_req, _info, { id } = {}) => {
     if (!id) return new Response(null, { status: 404 });
 
     const imageBase64 = await fetchGeneratedImage(id);
