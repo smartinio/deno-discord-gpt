@@ -10,7 +10,12 @@ import { AskAI } from "./ai.ts";
 import { lock, redis } from "./redis.ts";
 import { OpenAI } from "@openai/openai";
 import { Log } from "./logger.ts";
-import { resolveImageAsFile, saveGeneratedImage } from "./images.ts";
+import {
+  imageUrlToBase64,
+  imageUrlToFile,
+  savedImageToFile,
+  saveImage,
+} from "./images.ts";
 import { decodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") as string;
@@ -28,12 +33,12 @@ const setLastResponseId = async (channelId: bigint, responseId: string) => {
   return await redis.set(`openai:last_response_id:${channelId}`, responseId);
 };
 
-const getLastImageUrl = async (channelId: bigint) => {
-  return await redis.get<string>(`openai:last_image_url:${channelId}`);
+const getLastImageKey = async (channelId: bigint) => {
+  return await redis.get<string>(`openai:last_image_key:${channelId}`);
 };
 
-const setLastImageUrl = async (channelId: bigint, imageUrl: string) => {
-  return await redis.set(`openai:last_image_url:${channelId}`, imageUrl);
+const setLastImageKey = async (channelId: bigint, imageKey: string) => {
+  return await redis.set(`openai:last_image_key:${channelId}`, imageKey);
 };
 
 const systemPrompt =
@@ -124,12 +129,12 @@ const generateImage = async ({
 
 const editImage = async ({
   stringArgs,
-  url,
+  file,
   log,
   notify,
 }: {
   stringArgs: string;
-  url: string;
+  file: File;
   log: Log;
   notify: (message: string) => void;
 }): Promise<{ error: string } | { result: ImagesResponse }> => {
@@ -145,7 +150,7 @@ const editImage = async ({
 
   const { prompt } = args;
 
-  log.info("Editing image", { prompt, url });
+  log.info("Editing image", { prompt, file });
 
   notify("Editing image. Might take a while...");
 
@@ -153,7 +158,7 @@ const editImage = async ({
     result: await openAI.images.edit({
       prompt,
       model: "gpt-image-1",
-      image: await resolveImageAsFile(url),
+      image: file,
       quality: "medium",
       n: 1,
     }),
@@ -191,9 +196,10 @@ export const ask = async ({
 
     const inputImage = inputImages[0]?.image_url;
 
-    // todo make less hacky
     if (inputImage) {
-      await setLastImageUrl(channelId, inputImage);
+      const base64 = await imageUrlToBase64(inputImage);
+      const { key } = await saveImage(base64);
+      await setLastImageKey(channelId, key);
     }
 
     input.push({
@@ -229,7 +235,7 @@ export const ask = async ({
 
     let image: {
       mime: string;
-      url: string;
+      key: string;
       blob: Blob;
     } | undefined;
 
@@ -254,15 +260,15 @@ export const ask = async ({
         };
       }
 
-      const { mime, url } = await saveGeneratedImage(b64);
+      const { mime, key } = await saveImage(b64);
 
       image = {
         mime,
-        url,
+        key,
         blob: new Blob([decodeBase64(b64)], { type: mime }),
       };
 
-      await setLastImageUrl(channelId, image.url);
+      await setLastImageKey(channelId, image.key);
     };
 
     if (functionCall) {
@@ -285,18 +291,31 @@ export const ask = async ({
       }
 
       case "openai_images_edit": {
-        const url = inputImages[0]?.image_url ||
-          (await getLastImageUrl(channelId));
-
-        if (!url) {
-          return {
-            answer: "Sorry, I can't edit your image. Please try again.",
+        const file = await (async (): Promise<File | { answer: string }> => {
+          const fallback = {
+            answer: "Sorry, I don't know which image you want to edit.",
           };
+
+          if (inputImages[0]?.image_url) {
+            return await imageUrlToFile(inputImages[0].image_url);
+          }
+
+          const key = await getLastImageKey(channelId);
+
+          if (!key) {
+            return fallback;
+          }
+
+          return (await savedImageToFile(key)) || fallback;
+        })();
+
+        if ("answer" in file) {
+          return { answer: file.answer };
         }
 
         const imageResponse = await editImage({
           stringArgs: functionCall.arguments,
-          url,
+          file,
           log,
           notify,
         });

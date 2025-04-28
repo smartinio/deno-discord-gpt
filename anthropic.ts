@@ -1,7 +1,7 @@
 import Anthropic from "https://esm.sh/@anthropic-ai/sdk@0.36.3";
 
 import { type AskAI, createCache } from "./ai.ts";
-import { resolveImage } from "./images.ts";
+import { imageUrlToBase64 } from "./images.ts";
 
 const anthropic = new Anthropic({
   apiKey: Deno.env.get("ANTHROPIC_API_KEY") as string,
@@ -40,7 +40,7 @@ export const ask = async (
       source: {
         type: "base64" as const,
         media_type: contentType,
-        data: await resolveImage(url),
+        data: await imageUrlToBase64(url),
       },
     } satisfies Anthropic.ImageBlockParam)),
   );

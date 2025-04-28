@@ -17,7 +17,7 @@ import { shutdown } from "./shutdown.ts";
 import { retry } from "./retry.ts";
 import { ContentType, supportedContentTypes } from "./ai.ts";
 import { chunkString } from "./strings.ts";
-import { fetchGeneratedImage, fetchImageBlob } from "./images.ts";
+import { fetchImageBlob, fetchSavedImage } from "./images.ts";
 
 // todo: Don't hardcode these role ids
 const AI_CURIOUS_ROLE_IDS = [1098370802526724206n, 1123952489562132540n];
@@ -65,6 +65,8 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const baseUrl = Deno.env.get("BASE_URL") || "http://localhost:8000";
 
+let botStarted = false;
+
 const bot = createBot({
   token: DISCORD_TOKEN,
   intents: Intents.GuildMessages | Intents.MessageContent,
@@ -98,6 +100,9 @@ const bot = createBot({
     },
   },
   events: {
+    ready() {
+      botStarted = true;
+    },
     async messageCreate(msg): Promise<unknown> {
       const {
         id,
@@ -200,7 +205,7 @@ const bot = createBot({
       const respond = async (
         response: string | {
           answer: string;
-          image?: { mime: string; url: string; blob: Blob };
+          image?: { mime: string; key: string; blob: Blob };
         },
         { finished = true }: { finished?: boolean } = {},
       ) => {
@@ -211,7 +216,7 @@ const bot = createBot({
           | undefined = typeof response !== "string" && response.image
             ? {
               blob: response.image.blob,
-              name: response.image.url.split("/").at(-1)!,
+              name: response.image.key,
             }
             : undefined;
 
@@ -398,7 +403,7 @@ serve({
   "/generated-image/:id": async (_req, _info, { id } = {}) => {
     if (!id) return new Response(null, { status: 404 });
 
-    const image = await fetchGeneratedImage(id);
+    const image = await fetchSavedImage(id);
 
     if (!image) return new Response(null, { status: 404 });
 
@@ -430,6 +435,9 @@ serve({
   },
   "/": () => {
     return json({ ping: "pong" });
+  },
+  "/ready": () => {
+    return json({ ready: botStarted });
   },
   404: ({ url, referrer }) => {
     instanceLog.info("404 Not found", { url, referrer });
