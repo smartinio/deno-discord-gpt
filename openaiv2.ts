@@ -159,6 +159,8 @@ const editImage = async ({
   };
 };
 
+const model = "o4-mini";
+
 export const ask = async ({
   question,
   channelId,
@@ -202,7 +204,7 @@ export const ask = async ({
     });
 
     const response = await openAI.responses.create({
-      model: "o3",
+      model,
       input,
       store: true,
       previous_response_id: lastResponseId,
@@ -302,7 +304,7 @@ export const ask = async ({
     }
 
     const finalResponse = await openAI.responses.create({
-      model: "o3",
+      model,
       input: [
         {
           type: "function_call_output",
