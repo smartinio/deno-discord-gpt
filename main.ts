@@ -370,7 +370,7 @@ serve({
     return new Response(bytes, {
       headers: { "Content-Type": "image/jpeg" },
     });
-  };
+  },
   "/steam/connect/:ip": (_req, _info, params) => {
     if (!params?.ip?.match(/^\d+\.\d+\.\d+\.\d+:\d+$/)) {
       return new Response(null, { status: 400 });
