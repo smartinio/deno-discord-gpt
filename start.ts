@@ -144,6 +144,13 @@ const bot = createBot({
         !isAiResponseThread
       ) return;
 
+      instanceLog.info("Passed thread owner check", {
+        isAiResponseThread,
+        ct: chan.type,
+        ownerId: chan.ownerId,
+        clientId: DISCORD_CLIENT_ID,
+      });
+
       if (isDev && !msg.content.startsWith("!dev ") && !isAiResponseThread) {
         return;
       }
