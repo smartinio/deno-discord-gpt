@@ -135,21 +135,14 @@ const bot = createBot({
 
       const chan = await bot.helpers.getChannel(channelId);
 
-      const isAiResponseThread = chan.type === ChannelTypes.PublicThread ||
-        chan.type === ChannelTypes.PrivateThread &&
-          chan.ownerId === DISCORD_CLIENT_ID;
+      const isAiResponseThread = chan.type === (ChannelTypes.PublicThread ||
+            chan.type === ChannelTypes.PrivateThread) &&
+        chan.ownerId === DISCORD_CLIENT_ID;
 
       if (
         !isDev && !mentionedUserIds.includes(DISCORD_CLIENT_ID) &&
         !isAiResponseThread
       ) return;
-
-      instanceLog.info("Passed thread owner check", {
-        isAiResponseThread,
-        ct: chan.type,
-        ownerId: chan.ownerId,
-        clientId: DISCORD_CLIENT_ID,
-      });
 
       if (isDev && !msg.content.startsWith("!dev ") && !isAiResponseThread) {
         return;
