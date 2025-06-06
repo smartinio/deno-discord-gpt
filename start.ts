@@ -69,6 +69,8 @@ const baseUrl = Deno.env.get("BASE_URL") || "http://localhost:8000";
 let botStarted = false;
 
 const errorChannelMiddleware: Middleware = async (payload) => {
+  if (payload.level !== "error") return payload;
+
   await bot.helpers.sendMessage(ERRORS_CHANNEL_ID, {
     content: "```\n" + JSON.stringify(payload, null, 2) + "\n```",
   }).catch((error) => {
