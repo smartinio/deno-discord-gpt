@@ -6,12 +6,21 @@ const instanceId = crypto.randomUUID();
 
 export type Log = ReturnType<typeof createLog>;
 
-export const createLog = <T>(extra?: T) => {
+export type Middleware = Parameters<Logtail["use"]>[0];
+
+export const createLog = <T>(
+  extra?: T,
+  middlewares: Middleware[] = [],
+) => {
   if (!LOGTAIL_SOURCE_TOKEN) return console;
 
   const log = new Logtail(LOGTAIL_SOURCE_TOKEN, { batchInterval: 1000 });
 
   log.use((payload) => Promise.resolve({ ...payload, instanceId, ...extra }));
+
+  for (const middleware of middlewares) {
+    log.use(middleware);
+  }
 
   return log;
 };

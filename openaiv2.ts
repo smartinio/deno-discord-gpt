@@ -1,11 +1,3 @@
-import {
-  ResponseInput,
-  ResponseInputImage,
-} from "https://jsr.io/@openai/openai/4.96.0/resources/responses/responses.ts";
-import {
-  ImagesResponse,
-} from "https://jsr.io/@openai/openai/4.96.0/resources.ts";
-
 import { AskAI } from "./ai.ts";
 import { lock, redis } from "./redis.ts";
 import { OpenAI } from "@openai/openai";
@@ -17,6 +9,10 @@ import {
   saveImage,
 } from "./images.ts";
 import { decodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
+
+type ImagesResponse = OpenAI.Images.ImagesResponse;
+type ResponseInput = OpenAI.Responses.ResponseInput;
+type ResponseInputImage = OpenAI.Responses.ResponseInputImage;
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") as string;
 
@@ -214,7 +210,7 @@ export const ask = async ({
       model,
       input,
       store: true,
-      previous_response_id: lastResponseId,
+      previous_response_id: lastResponseId || null,
       tool_choice: "auto",
       tools: [
         openai_images_generate,

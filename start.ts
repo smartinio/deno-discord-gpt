@@ -12,16 +12,17 @@ import {
 import * as anthropic from "./anthropic.ts";
 import * as openai from "./openaiv2.ts";
 import { redis } from "./redis.ts";
-import { createLog } from "./logger.ts";
+import { createLog, Middleware } from "./logger.ts";
 import { shutdown } from "./shutdown.ts";
 import { retry } from "./retry.ts";
 import { ContentType, supportedContentTypes } from "./ai.ts";
 import { chunkString } from "./strings.ts";
-import { fetchImageBlob, fetchSavedImage } from "./images.ts";
+import { fetchSavedImage } from "./images.ts";
 
 // todo: Don't hardcode these role ids
 const AI_CURIOUS_ROLE_IDS = [1098370802526724206n, 1123952489562132540n];
 const DISCORD_CLIENT_ID = BigInt(Deno.env.get("DISCORD_CLIENT_ID") as string);
+const ERRORS_CHANNEL_ID = BigInt(Deno.env.get("ERRORS_CHANNEL_ID") as string);
 const DISCORD_TOKEN = Deno.env.get("DISCORD_TOKEN") as string;
 const INITIAL_MENTION = new RegExp(`^<@${DISCORD_CLIENT_ID}>\s*`);
 const MIDWAY_MENTION = new RegExp(`<@${DISCORD_CLIENT_ID}>`);
@@ -66,6 +67,16 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const baseUrl = Deno.env.get("BASE_URL") || "http://localhost:8000";
 
 let botStarted = false;
+
+const errorChannelMiddleware: Middleware = async (payload) => {
+  await bot.helpers.sendMessage(ERRORS_CHANNEL_ID, {
+    content: "```\n" + JSON.stringify(payload, null, 2) + "\n```",
+  }).catch((error) => {
+    console.error(error);
+  });
+
+  return payload;
+};
 
 const bot = createBot({
   token: DISCORD_TOKEN,
@@ -156,7 +167,9 @@ const bot = createBot({
 
       const messageId = String(id);
 
-      const log = createLog({ messageId, from: msg.member?.nick });
+      const log = createLog({ messageId, from: msg.member?.nick }, [
+        errorChannelMiddleware,
+      ]);
 
       if (shutdown.imminent) {
         log.info("Shutdown imminent, skipping message");
@@ -254,7 +267,7 @@ const bot = createBot({
 
             await retry(() =>
               bot.helpers.sendMessage(threadId, {
-                files: i === chunks.length - 1 && file ? [file] : undefined,
+                ...(file && i === chunks.length - 1 ? { files: [file] } : {}),
                 content: chunk,
               })
             );

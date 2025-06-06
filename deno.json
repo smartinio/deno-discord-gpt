@@ -4,6 +4,25 @@
     "ts": "deno check *.ts"
   },
   "imports": {
-    "@openai/openai": "jsr:@openai/openai@^4.96.0"
+    "@openai/openai": "jsr:@openai/openai@^4.102.0"
+  },
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "fmt": {
+    "indentWidth": 2,
+    "lineWidth": 80,
+    "proseWrap": "preserve",
+    "semiColons": true
+  },
+  "lint": {
+    "rules": {
+      "tags": ["recommended"]
+    }
   }
 }
