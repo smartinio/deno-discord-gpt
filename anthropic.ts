@@ -1,4 +1,4 @@
-import Anthropic from "https://esm.sh/@anthropic-ai/sdk@0.36.3";
+import Anthropic from "@anthropic-ai/sdk";
 
 import { type AskAI, createCache } from "./ai.ts";
 import { imageUrlToBase64 } from "./images.ts";
@@ -21,6 +21,7 @@ export const ask = async (
     channelId,
     question,
     images = [],
+    model = "claude-sonnet-4-0",
   }: AskAI,
 ): Promise<string> => {
   if (question.toLowerCase() === "reset") {
@@ -57,7 +58,7 @@ export const ask = async (
 
   const response = await anthropic.messages.create({
     system: initialMessage,
-    model: "claude-3-5-sonnet-latest",
+    model: model,
     max_tokens: 4000,
     temperature: 0,
     messages,

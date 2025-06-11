@@ -7,7 +7,7 @@ import {
   CreateMessageOptions,
   Intents,
   MessageTypes,
-} from "npm:@discordeno/bot@21.0.0";
+} from "@discordeno/bot";
 
 import * as anthropic from "./anthropic.ts";
 import * as openai from "./openaiv2.ts";
@@ -44,8 +44,8 @@ const continueTyping = (channelId: bigint) => {
 const isDev = Deno.env.get("LOCAL_DEV") === "true";
 
 const providerModels = [
-  "openai:o4-mini",
-  "anthropic:claude-3-5-sonnet-latest",
+  "openai:o3",
+  "anthropic:claude-sonnet-4-0",
 ] as const;
 
 type Provider = typeof providerModels[number];
@@ -364,7 +364,7 @@ const bot = createBot({
       const providerModel = (await getProviderModel(channelId)) ||
         chan.parentId &&
           (await getProviderModel(chan.parentId)) ||
-        "openai:gpt-4o";
+        providerModels[0];
 
       const [provider, model] = providerModel.split(":");
 

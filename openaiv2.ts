@@ -161,14 +161,13 @@ const editImage = async ({
   };
 };
 
-const model = "o4-mini";
-
 export const ask = async ({
   question,
   channelId,
   log,
   images = [],
   notify,
+  model = "o3",
 }: AskAI): Promise<string | { answer: string; imageUrl?: string }> => {
   return await lock(channelId, async () => {
     const lastResponseId = await getLastResponseId(channelId) || undefined;
