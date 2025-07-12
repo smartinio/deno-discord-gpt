@@ -207,6 +207,9 @@ export const ask = async ({
 
     const response = await openAI.responses.create({
       model,
+      reasoning: {
+        effort: "low",
+      },
       input,
       store: true,
       previous_response_id: lastResponseId || null,
@@ -355,8 +358,13 @@ export const ask = async ({
 
     await setLastResponseId(channelId, finalResponse.id);
 
+    const textWithoutPreviews = finalResponse.output_text.replace(
+      /https?:\/\/[^\s<>]+/g,
+      "<$&>",
+    );
+
     return {
-      answer: finalResponse.output_text,
+      answer: textWithoutPreviews,
       image,
     };
   });
