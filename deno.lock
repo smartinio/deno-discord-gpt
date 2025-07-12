@@ -1,14 +1,14 @@
 {
   "version": "5",
   "specifiers": {
-    "jsr:@openai/openai@^4.102.0": "4.102.0",
+    "jsr:@openai/openai@5.9.0": "5.9.0",
     "npm:@anthropic-ai/sdk@0.53": "0.53.0",
     "npm:@discordeno/bot@21.0.0": "21.0.0",
     "npm:@types/node@*": "22.15.15"
   },
   "jsr": {
-    "@openai/openai@4.102.0": {
-      "integrity": "ea5201bc5c8a696d3a5139a9cd2252e3ab9b2b880769a9cd7f05602ea1a02acf"
+    "@openai/openai@5.9.0": {
+      "integrity": "88fddee6b660fbfa415e0896484de032cac1768c35eeb4e7330323086256c4d6"
     }
   },
   "npm": {
@@ -238,7 +238,7 @@
   },
   "workspace": {
     "dependencies": [
-      "jsr:@openai/openai@^4.102.0",
+      "jsr:@openai/openai@5.9.0",
       "npm:@anthropic-ai/sdk@0.53",
       "npm:@discordeno/bot@21.0.0"
     ]

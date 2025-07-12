@@ -212,6 +212,7 @@ export const ask = async ({
       previous_response_id: lastResponseId || null,
       tool_choice: "auto",
       tools: [
+        { type: "web_search_preview" },
         openai_images_generate,
         openai_images_edit,
       ],

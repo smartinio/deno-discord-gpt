@@ -4,7 +4,7 @@
     "ts": "deno check *.ts"
   },
   "imports": {
-    "@openai/openai": "jsr:@openai/openai@^4.102.0",
+    "@openai/openai": "jsr:@openai/openai@5.9.0",
     "@discordeno/bot": "npm:@discordeno/bot@21.0.0",
     "@anthropic-ai/sdk": "npm:@anthropic-ai/sdk@^0.53.0"
   },

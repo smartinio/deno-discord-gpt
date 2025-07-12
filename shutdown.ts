@@ -20,13 +20,11 @@ const delay = isDev ? 0 : 10000;
 const sleep = (ms: number) =>
   new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), ms));
 
-const deploymentChannel = new BroadcastChannel("deployment");
 const deploymentId = Deno.env.get("DENO_DEPLOYMENT_ID") as string;
 
 const shutdownHandler = async (type: string) => {
   instanceLog.info("Shutdown signal received", { type, deploymentId });
   shutdown.imminent = true;
-  deploymentChannel.close();
   const race = await Promise.race([sleep(delay), pendingWorkPromise]);
   instanceLog.info("Exiting in graceful shutdown", { type, race });
   Deno.exit(0);
@@ -41,13 +39,3 @@ globalThis.addEventListener("error", (e) => {
 });
 
 gracefulShutdown(shutdownHandler);
-
-deploymentChannel.onmessage = (e) => {
-  if (e.data.deploymentId === deploymentId) return;
-  if (e.data.deployedAt > Date.now()) {
-    instanceLog.info("Later deployment detected", e.data);
-    shutdownHandler("deployment");
-  }
-};
-
-deploymentChannel.postMessage({ deploymentId, deployedAt: Date.now() });
