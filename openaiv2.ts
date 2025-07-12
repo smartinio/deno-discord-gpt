@@ -212,7 +212,16 @@ export const ask = async ({
       previous_response_id: lastResponseId || null,
       tool_choice: "auto",
       tools: [
-        { type: "web_search_preview" },
+        {
+          type: "web_search_preview",
+          user_location: {
+            type: "approximate",
+            country: "SE",
+            region: "Stockholm",
+            city: "Stockholm",
+            timezone: "Europe/Stockholm",
+          },
+        },
         openai_images_generate,
         openai_images_edit,
       ],
